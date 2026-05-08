@@ -1,0 +1,128 @@
+/* ═══════════════════════════════════════════════
+   KENTAUROS DESIGN SYSTEM — TOKENS
+   ═══════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ── Brand Colors ── */
+  --k-gold-100: #FDF9EB;
+  --k-gold-300: #E8C547;
+  --k-gold-500: #D4AF37; /* Base Gold */
+  --k-gold-700: #9E8124;
+  --k-gold-900: #4A3A0B;
+  --k-gold-dim: rgba(212, 175, 55, 0.15);
+  --k-gold-glow: 0 0 20px rgba(212, 175, 55, 0.35);
+
+  --k-blue-100: #EBF4FF;
+  --k-blue-300: #93C5FD;
+  --k-blue-500: #3B82F6; /* Base Blue */
+  --k-blue-700: #1D4ED8;
+  --k-blue-900: #1E3A8A;
+  --k-blue-dim: rgba(59, 130, 246, 0.15);
+  --k-blue-glow: 0 0 20px rgba(59, 130, 246, 0.35);
+
+  --k-cyan-500: #06B6D4;
+
+  /* ── Backgrounds (Deep Premium Dark) ── */
+  --bg-base: #03050A;       /* Deepest background */
+  --bg-app: #080C16;        /* App content background */
+  --bg-surface: #101625;    /* Cards, Modals */
+  --bg-raised: #172034;     /* Raised elements (Inputs, Tabs) */
+  --bg-overlay: #1D2840;    /* Hover states */
+  --bg-hover: rgba(255, 255, 255, 0.04);
+
+  /* ── Text Colors ── */
+  --text-primary: #FFFFFF;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --text-inverse: #03050A;
+
+  /* ── Borders & Dividers ── */
+  --border-subtle: rgba(255, 255, 255, 0.03);
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --border-accent: rgba(212, 175, 55, 0.4);
+
+  /* ── Semantic Colors ── */
+  --success: #10B981;
+  --success-dim: rgba(16, 185, 129, 0.15);
+  --warning: #F59E0B;
+  --warning-dim: rgba(245, 158, 11, 0.15);
+  --danger: #EF4444;
+  --danger-dim: rgba(239, 68, 68, 0.15);
+  --info: #3B82F6;
+  --info-dim: rgba(59, 130, 246, 0.15);
+  --purple: #8B5CF6;
+  --purple-dim: rgba(139, 92, 246, 0.15);
+
+  /* ── Spacing Scale (4px Base) ── */
+  --sp-0: 0px;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+  --sp-24: 96px;
+
+  /* ── Border Radius ── */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* ── Shadows & Depth ── */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 50px rgba(0, 0, 0, 0.8), 0 8px 16px rgba(0, 0, 0, 0.5);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+
+  /* ── Typography ── */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  
+  --text-xs: 0.75rem;     /* 12px */
+  --text-sm: 0.875rem;    /* 14px */
+  --text-base: 1rem;      /* 16px */
+  --text-md: 1.125rem;    /* 18px */
+  --text-lg: 1.25rem;     /* 20px */
+  --text-xl: 1.5rem;      /* 24px */
+  --text-2xl: 2rem;       /* 32px */
+  --text-3xl: 2.5rem;     /* 40px */
+  
+  --leading-none: 1;
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.75;
+  
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.05em;
+
+  /* ── Layout Defaults ── */
+  --sidebar-w: 280px;
+  --sidebar-collapsed-w: 80px;
+  --topbar-h: 64px;
+
+  /* ── Transitions ── */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+
+  /* ── Z-Index Scale ── */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-sidebar: 300;
+  --z-topbar: 400;
+  --z-modal: 500;
+  --z-toast: 600;
+}

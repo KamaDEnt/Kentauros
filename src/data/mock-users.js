@@ -1,0 +1,44 @@
+export const mockUsers = [
+  { id: 1, tenant_id: 'tenant-a', name: 'Admin Master', email: 'admin@kentauros.com', role: 'admin', tags: ['ADMIN', 'DEV', 'QA', 'UX'], avatar: 'AM', status: 'active', department: 'TI', since: '2022-01-01' },
+  { id: 2, tenant_id: 'tenant-b', name: 'Carlos Vendas', email: 'carlos@kentauros.com', role: 'comercial', tags: ['COMERCIAL'], avatar: 'CV', status: 'active', department: 'Comercial', since: '2022-03-15' },
+  { id: 3, tenant_id: 'tenant-a', name: 'Ana Pré-Venda', email: 'ana@kentauros.com', role: 'prevendas', tags: ['COMERCIAL'], avatar: 'AP', status: 'active', department: 'Comercial', since: '2022-06-01' },
+  { id: 4, tenant_id: 'tenant-b', name: 'Bruno BA', email: 'bruno@kentauros.com', role: 'ba', tags: ['ADMIN'], avatar: 'BB', status: 'active', department: 'Tecnologia', since: '2021-11-01' },
+  { id: 5, tenant_id: 'tenant-a', name: 'Fernanda PO', email: 'fernanda@kentauros.com', role: 'po', tags: ['ADMIN', 'DEV'], avatar: 'FP', status: 'active', department: 'Tecnologia', since: '2022-02-01' },
+  { id: 6, tenant_id: 'tenant-b', name: 'Ricardo PM', email: 'ricardo@kentauros.com', role: 'pm', tags: ['ADMIN', 'DEVOPS'], avatar: 'RP', status: 'active', department: 'Tecnologia', since: '2021-08-01' },
+  { id: 7, tenant_id: 'tenant-a', name: 'Juliana UX', email: 'juliana@kentauros.com', role: 'ux', tags: ['UX'], avatar: 'JU', status: 'active', department: 'Design', since: '2023-01-15' },
+  { id: 8, tenant_id: 'tenant-b', name: 'Marcos Dev', email: 'marcos@kentauros.com', role: 'dev', tags: ['DEV'], avatar: 'MD', status: 'active', department: 'Desenvolvimento', since: '2022-09-01' },
+  { id: 9, tenant_id: 'tenant-a', name: 'Paula QA', email: 'paula@kentauros.com', role: 'qa', tags: ['QA', 'DEV'], avatar: 'PQ', status: 'active', department: 'Qualidade', since: '2023-03-01' },
+  { id: 10, tenant_id: 'tenant-b', name: 'Diego DevOps', email: 'diego@kentauros.com', role: 'devops', tags: ['DEVOPS'], avatar: 'DD', status: 'active', department: 'Infraestrutura', since: '2022-11-01' },
+  { id: 11, tenant_id: 'tenant-a', name: 'Lucia Suporte', email: 'lucia@kentauros.com', role: 'suporte', avatar: 'LS', status: 'active', department: 'Suporte', since: '2023-05-01' },
+  { id: 12, tenant_id: 'tenant-b', name: 'Cliente Demo', email: 'cliente@empresa.com', role: 'cliente', avatar: 'CD', status: 'active', department: 'Externo', since: '2024-01-01' },
+];
+
+export const ROLES = {
+  admin: { label: 'Admin', color: 'purple' },
+  comercial: { label: 'Comercial', color: 'blue' },
+  prevendas: { label: 'Pré-vendas', color: 'blue' },
+  ba: { label: 'Business Analyst', color: 'green' },
+  po: { label: 'Product Owner', color: 'green' },
+  pm: { label: 'Project Manager', color: 'green' },
+  ux: { label: 'UX/UI Designer', color: 'orange' },
+  dev: { label: 'Desenvolvedor', color: 'yellow' },
+  qa: { label: 'QA Engineer', color: 'yellow' },
+  devops: { label: 'DevOps', color: 'red' },
+  suporte: { label: 'Suporte', color: 'gray' },
+  cliente: { label: 'Cliente', color: 'gray' },
+};
+
+export const PERMISSIONS = {
+  admin:     { dashboard:true, leads:true, discovery:true, proposals:true, projects:true, backlog:true, ux:true, dev:true, qa:true, deploy:true, support:true, clients:true, users:true, automations:true, settings:true },
+  comercial: { dashboard:true, leads:true, discovery:false, proposals:true, projects:false, backlog:false, ux:false, dev:false, qa:false, deploy:false, support:false, clients:true, users:false, automations:false, settings:true },
+  prevendas: { dashboard:true, leads:true, discovery:true, proposals:true, projects:false, backlog:false, ux:false, dev:false, qa:false, deploy:false, support:false, clients:true, users:false, automations:false, settings:true },
+  ba:        { dashboard:true, leads:false, discovery:true, proposals:true, projects:true, backlog:true, ux:true, dev:false, qa:false, deploy:false, support:false, clients:true, users:false, automations:false, settings:true },
+  po:        { dashboard:true, leads:false, discovery:true, proposals:true, projects:true, backlog:true, ux:true, dev:true, qa:true, deploy:false, support:false, clients:true, users:false, automations:true, settings:true },
+  pm:        { dashboard:true, leads:false, discovery:true, proposals:true, projects:true, backlog:true, ux:true, dev:true, qa:true, deploy:true, support:true, clients:true, users:false, automations:true, settings:true },
+  ux:        { dashboard:true, leads:false, discovery:false, proposals:false, projects:true, backlog:true, ux:true, dev:false, qa:false, deploy:false, support:false, clients:false, users:false, automations:false, settings:true },
+  dev:       { dashboard:true, leads:false, discovery:false, proposals:false, projects:true, backlog:true, ux:false, dev:true, qa:false, deploy:false, support:false, clients:false, users:false, automations:false, settings:true },
+  qa:        { dashboard:true, leads:false, discovery:false, proposals:false, projects:true, backlog:true, ux:false, dev:false, qa:true, deploy:false, support:false, clients:false, users:false, automations:false, settings:true },
+  devops:    { dashboard:true, leads:false, discovery:false, proposals:false, projects:true, backlog:false, ux:false, dev:false, qa:false, deploy:true, support:false, clients:false, users:false, automations:true, settings:true },
+  suporte:   { dashboard:true, leads:false, discovery:false, proposals:false, projects:false, backlog:false, ux:false, dev:false, qa:false, deploy:false, support:true, clients:true, users:false, automations:false, settings:true },
+  cliente:   { dashboard:true, leads:false, discovery:false, proposals:false, projects:true, backlog:false, ux:false, dev:false, qa:false, deploy:false, support:true, clients:false, users:false, automations:false, settings:false },
+};

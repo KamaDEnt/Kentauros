@@ -1,0 +1,616 @@
+import React, { useState } from 'react';
+import { useData } from '../context/DataContext';
+import { useApp } from '../context/AppContext';
+import { useI18n } from '../context/I18nContext';
+import PageHeader from '../components/ui/PageHeader';
+import Card from '../components/ui/Card';
+import Badge from '../components/ui/Badge';
+import Modal from '../components/ui/Modal';
+import { useWorkflow } from '../hooks/useWorkflow';
+import Timeline from '../components/ui/Timeline';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
+import Textarea from '../components/ui/Textarea';
+import EmptyState from '../components/ui/EmptyState';
+import { Search, Plus, Building2, User, Mail, Phone, DollarSign, Filter, Zap } from 'lucide-react';
+import CaptureModal from '../components/leads/CaptureModal';
+import { createLeadInteraction } from '../services/leadCapture/leadConversionStrategy';
+
+const LEAD_STATUSES = ['new', 'qualified', 'discovery', 'proposal', 'won', 'lost'];
+
+const Leads = () => {
+  const { t } = useI18n();
+  const { leads, addLead, updateLead, deleteLead } = useData();
+  const { user, addNotification } = useApp();
+  const { promoteLeadToDiscovery } = useWorkflow();
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [leadToDelete, setLeadToDelete] = useState(null);
+  const [isEditingLead, setIsEditingLead] = useState(false);
+  const [editLead, setEditLead] = useState(null);
+  const [isNewLeadModalOpen, setIsNewLeadModalOpen] = useState(false);
+  const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false);
+
+  // New lead form state
+  const [newLead, setNewLead] = useState({
+    company: '',
+    contact: '',
+    email: '',
+    phone: '',
+    source: 'LinkedIn',
+    value: 0,
+    notes: ''
+  });
+
+  const filteredLeads = leads.filter(lead => {
+    const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
+    const matchesSearch = (lead.company || '').toLowerCase().includes(search.toLowerCase()) || 
+                         (lead.contact || '').toLowerCase().includes(search.toLowerCase());
+    const matchesSource = sourceFilter === 'all' || lead.source === sourceFilter;
+    const isCapturedLead = lead.source === 'Captura Automática' || lead.pricingModel === 'ai_development' || lead.captureIdentity;
+    const matchesOwner = !isCapturedLead ||
+      !lead.commercialOwnerUserId ||
+      lead.commercialOwnerUserId === user?.id ||
+      user?.role === 'admin';
+    return matchesStatus && matchesSearch && matchesSource && matchesOwner;
+  });
+
+  const getStatusType = (status) => {
+    switch (status) {
+      case 'new': return 'secondary';
+      case 'qualified': return 'accent';
+      case 'discovery': return 'accent';
+      case 'proposal': return 'warning';
+      case 'won': return 'success';
+      case 'lost': return 'danger';
+      default: return 'secondary';
+    }
+  };
+
+  const handleStatusChange = (lead, status) => {
+    updateLead(lead.id, {
+      status,
+      lastActivity: new Date().toISOString().split('T')[0],
+      interactionHistory: [
+        ...(lead.interactionHistory || []),
+        createLeadInteraction('status_changed', `Status alterado para ${t(`status.${status}`)}.`, {
+          from: lead.status,
+          to: status,
+          actor: user?.id,
+        }),
+      ],
+    });
+    addNotification('Status atualizado', `${lead.company} movido para ${t(`status.${status}`)}.`, 'success');
+  };
+
+  const handleCreateLead = (e) => {
+    e.preventDefault();
+    if (!newLead.company || !newLead.contact) {
+      addNotification(t('common.error', 'Error'), t('leads.notifications.error.required', 'Company and Contact are required.'), 'error');
+      return;
+    }
+
+    addLead({
+      ...newLead,
+      status: 'new',
+      score: Math.floor(Math.random() * 40) + 30, // Random initial score
+      stage: 'warm',
+      createdAt: new Date().toISOString().split('T')[0],
+      lastActivity: new Date().toISOString().split('T')[0]
+    });
+
+    addNotification(t('common.success', 'Success'), t('leads.notifications.success.added', 'New lead added to the pipeline.'), 'success');
+    setIsNewLeadModalOpen(false);
+    setNewLead({
+      company: '',
+      contact: '',
+      email: '',
+      phone: '',
+      source: 'LinkedIn',
+      value: 0,
+      notes: ''
+    });
+  };
+
+  const handleDeleteLead = () => {
+    if (!leadToDelete) return;
+    deleteLead(leadToDelete.id);
+    if (selectedLead?.id === leadToDelete.id) {
+      setSelectedLead(null);
+    }
+    addNotification('Lead removido', `${leadToDelete.company} foi removido da gestão de leads.`, 'success');
+    setLeadToDelete(null);
+  };
+
+  const openLeadDetails = (lead) => {
+    setSelectedLead(lead);
+    setIsEditingLead(false);
+    setEditLead(null);
+  };
+
+  const startEditLead = () => {
+    setEditLead({
+      company: selectedLead.company || '',
+      contact: selectedLead.contact || '',
+      email: selectedLead.email || '',
+      phone: selectedLead.phone || '',
+      source: selectedLead.source || 'Site',
+      value: selectedLead.value || 0,
+      status: selectedLead.status || 'new',
+      industry: selectedLead.industry || '',
+      notes: selectedLead.notes || '',
+    });
+    setIsEditingLead(true);
+  };
+
+  const saveLeadEdit = () => {
+    if (!selectedLead || !editLead) return;
+    const updated = {
+      ...editLead,
+      value: Number(editLead.value || 0),
+      lastActivity: new Date().toISOString().split('T')[0],
+      interactionHistory: [
+        ...(selectedLead.interactionHistory || []),
+        createLeadInteraction('lead_edited', 'Dados do lead atualizados manualmente.', {
+          actor: user?.id,
+          changedFields: Object.keys(editLead).filter(key => editLead[key] !== selectedLead[key]),
+        }),
+      ],
+    };
+    updateLead(selectedLead.id, updated);
+    setSelectedLead({ ...selectedLead, ...updated });
+    setIsEditingLead(false);
+    setEditLead(null);
+    addNotification('Lead atualizado', `${updated.company} foi atualizado com sucesso.`, 'success');
+  };
+
+  const getHistory = (lead) => {
+    const history = [
+      { title: t('leads.history.created.title', 'Lead Created'), timestamp: lead.createdAt, status: 'success', description: t('leads.history.created.desc', `Lead acquired via ${lead.source}.`, { source: lead.source }) }
+    ];
+
+    if (lead.status !== 'new') {
+      const qualifiedDate = new Date(lead.createdAt);
+      qualifiedDate.setDate(qualifiedDate.getDate() + 3);
+      history.push({ 
+        title: t('leads.history.qualified.title', 'Lead Qualified'), 
+        timestamp: qualifiedDate.toISOString().split('T')[0], 
+        status: 'success', 
+        description: t('leads.history.qualified.desc', 'Lead score reached target threshold.') 
+      });
+    }
+
+    if (['discovery', 'proposal', 'won'].includes(lead.status)) {
+      const discoveryDate = new Date(lead.createdAt);
+      discoveryDate.setDate(discoveryDate.getDate() + 7);
+      history.push({ 
+        title: t('leads.history.discovery.title', 'Moved to Discovery'), 
+        timestamp: discoveryDate.toISOString().split('T')[0], 
+        status: 'success', 
+        description: t('leads.history.discovery.desc', 'Discovery phase initiated with Analyst.') 
+      });
+    }
+
+    if (['proposal', 'won'].includes(lead.status)) {
+      const proposalDate = new Date(lead.createdAt);
+      proposalDate.setDate(proposalDate.getDate() + 12);
+      history.push({ 
+        title: t('leads.history.proposal.title', 'Proposal Generated'), 
+        timestamp: proposalDate.toISOString().split('T')[0], 
+        status: 'success', 
+        description: t('leads.history.proposal.desc', 'Commercial proposal sent to client.') 
+      });
+    }
+
+    return history.reverse();
+  };
+
+  return (
+    <div className="leads-page animate-fade-in">
+      <PageHeader 
+        title={t('leads.title')} 
+        subtitle={t('leads.subtitle')}
+        actions={
+          <div className="flex gap-md">
+            <Button 
+              variant="success" 
+              onClick={() => setIsCaptureModalOpen(true)}
+              icon={Zap}
+              className="bg-success hover:bg-[#0ea271] text-white border-none shadow-[0_4px_12px_rgba(16,185,129,0.25)]"
+            >
+              {t('leads.capture.button', 'Captura Automática')}
+            </Button>
+            <Button variant="primary" onClick={() => setIsNewLeadModalOpen(true)} icon={Plus}>{t('leads.addNew')}</Button>
+          </div>
+        }
+      />
+
+      <Card>
+        <div className="flex justify-between items-center mb-lg gap-md flex-wrap">
+          <div className="tabs m-0">
+            {['all', 'new', 'qualified', 'discovery', 'proposal', 'won', 'lost'].map(st => (
+              <button 
+                key={st}
+                className={`tab ${statusFilter === st ? 'active' : ''}`} 
+                onClick={() => setStatusFilter(st)}
+              >
+                {st === 'all' ? t('leads.allLeads') : t(`status.${st}`)}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex gap-md items-end">
+            <Input 
+              placeholder={t('leads.searchPlaceholder')} 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              icon={Search}
+              wrapperClassName="w-80"
+            />
+            <Select 
+              value={sourceFilter}
+              onChange={setSourceFilter}
+              options={[
+                { value: 'all', label: t('common.allSources') },
+                { value: 'LinkedIn', label: t('leads.form.source.linkedin') },
+                { value: 'Indicação', label: t('leads.form.source.referral') },
+                { value: 'Site', label: t('leads.form.source.website') },
+                { value: 'Evento', label: t('leads.form.source.event') },
+                { value: 'Google Ads', label: t('leads.form.source.googleAds') },
+                { value: 'Captura Automática', label: t('leads.capture.button', 'Captura Automática') },
+              ]}
+              wrapperClassName="w-48"
+            />
+          </div>
+        </div>
+
+        <div className="table-wrapper">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>{t('leads.company')}</th>
+                <th>{t('leads.contact')}</th>
+                <th>{t('leads.value')}</th>
+                <th>{t('common.status')}</th>
+                <th>{t('leads.source')}</th>
+                <th>{t('common.actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredLeads.map(lead => (
+                <tr key={lead.id}>
+                  <td>
+                    <div className="font-bold">{lead.company}</div>
+                    <div className="text-xs text-muted">{lead.industry || 'Tecnologia'}</div>
+                  </td>
+                  <td>
+                    <div>{lead.contact}</div>
+                    <div className="text-xs text-muted">{lead.email}</div>
+                  </td>
+                  <td>
+                    <div className="font-mono font-bold">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(lead.value)}
+                    </div>
+                    {lead.pricingModel === 'ai_development' && (
+                      <div className="text-xs text-muted">
+                        IA + {lead.commercialOwnerName || 'Comercial'}
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={getStatusType(lead.status)}>
+                        {t(`status.${lead.status}`)}
+                      </Badge>
+                      <Select
+                        value={lead.status || 'new'}
+                        onChange={(status) => handleStatusChange(lead, status)}
+                        options={LEAD_STATUSES.map(status => ({
+                          value: status,
+                          label: t(`status.${status}`),
+                        }))}
+                        wrapperClassName="lead-status-select"
+                      />
+                    </div>
+                  </td>
+                  <td className="text-sm">{lead.source}</td>
+                  <td>
+                    <div className="flex gap-sm">
+                      <Button variant="secondary" size="sm" onClick={() => openLeadDetails(lead)}>{t('common.details')}</Button>
+                      {lead.status === 'new' && (
+                        <Button 
+                          variant="primary" 
+                          size="sm"
+                          onClick={() => promoteLeadToDiscovery(lead)}
+                        >
+                          {t('common.promote')}
+                        </Button>
+                      )}
+                      <Button variant="danger" size="sm" onClick={() => setLeadToDelete(lead)}>Excluir</Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredLeads.length === 0 && (
+                <tr>
+                  <td colSpan="6">
+                    <EmptyState 
+                      title={t('leads.noLeads')}
+                      description={t('leads.noLeadsDesc', 'Try adjusting your filters to find what you are looking for.')}
+                    />
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* New Lead Modal */}
+      <Modal
+        isOpen={isNewLeadModalOpen}
+        onClose={() => setIsNewLeadModalOpen(false)}
+        title={t('leads.addNew')}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setIsNewLeadModalOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="primary" onClick={handleCreateLead}>{t('common.add')}</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-6">
+          <div className="grid grid-2">
+            <Input 
+              label={t('leads.companyName')}
+              value={newLead.company}
+              onChange={e => setNewLead({...newLead, company: e.target.value})}
+              placeholder="Innovate Inc."
+              icon={Building2}
+            />
+            <Input 
+              label={t('leads.contactName')}
+              value={newLead.contact}
+              onChange={e => setNewLead({...newLead, contact: e.target.value})}
+              placeholder="John Doe"
+              icon={User}
+            />
+          </div>
+          <div className="grid grid-2">
+            <Input 
+              label={t('leads.form.email', 'Email')}
+              type="email"
+              value={newLead.email}
+              onChange={e => setNewLead({...newLead, email: e.target.value})}
+              placeholder="john@example.com"
+              icon={Mail}
+            />
+            <Input 
+              label={t('leads.form.phone', 'Telefone')}
+              value={newLead.phone}
+              onChange={e => setNewLead({...newLead, phone: e.target.value})}
+              placeholder="(11) 98888-7777"
+              icon={Phone}
+            />
+          </div>
+          <div className="grid grid-2">
+            <Select 
+              label={t('leads.source')}
+              value={newLead.source}
+              onChange={val => setNewLead({...newLead, source: val})}
+              options={[
+                { value: 'LinkedIn', label: t('leads.form.source.linkedin') },
+                { value: 'Indicação', label: t('leads.form.source.referral') },
+                { value: 'Site', label: t('leads.form.source.website') },
+                { value: 'Evento', label: t('leads.form.source.event') },
+                { value: 'Google Ads', label: t('leads.form.source.googleAds') },
+              ]}
+            />
+            <Input 
+              label={t('leads.estimatedValueBrl')}
+              type="number"
+              value={newLead.value}
+              onChange={e => setNewLead({...newLead, value: parseFloat(e.target.value)})}
+              icon={DollarSign}
+            />
+          </div>
+          <Textarea 
+            label={t('common.notes')}
+            value={newLead.notes}
+            onChange={e => setNewLead({...newLead, notes: e.target.value})}
+            placeholder="Internal notes about the lead..."
+          />
+        </div>
+      </Modal>
+      
+      {/* Capture Modal */}
+      <CaptureModal 
+        isOpen={isCaptureModalOpen} 
+        onClose={() => setIsCaptureModalOpen(false)} 
+      />
+
+      {/* Details Modal */}
+      <Modal
+        isOpen={!!selectedLead}
+        onClose={() => { setSelectedLead(null); setIsEditingLead(false); setEditLead(null); }}
+        title={selectedLead?.company}
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => { setSelectedLead(null); setIsEditingLead(false); setEditLead(null); }}>{t('common.close')}</Button>
+            <Button variant="danger" onClick={() => setLeadToDelete(selectedLead)}>Excluir</Button>
+            {isEditingLead ? (
+              <Button variant="primary" onClick={saveLeadEdit}>Salvar</Button>
+            ) : (
+              <Button variant="primary" onClick={startEditLead}>{t('common.edit')}</Button>
+            )}
+          </>
+        }
+      >
+        {selectedLead && (
+          <div className="lead-details">
+            {isEditingLead && editLead ? (
+              <div className="lead-edit-form">
+                <div className="grid grid-2">
+                  <Input label="Empresa" value={editLead.company} onChange={event => setEditLead(prev => ({ ...prev, company: event.target.value }))} />
+                  <Input label="Contato" value={editLead.contact} onChange={event => setEditLead(prev => ({ ...prev, contact: event.target.value }))} />
+                  <Input label="E-mail" type="email" value={editLead.email} onChange={event => setEditLead(prev => ({ ...prev, email: event.target.value }))} />
+                  <Input label="Telefone" value={editLead.phone} onChange={event => setEditLead(prev => ({ ...prev, phone: event.target.value }))} />
+                  <Input label="Segmento" value={editLead.industry} onChange={event => setEditLead(prev => ({ ...prev, industry: event.target.value }))} />
+                  <Input label="Valor estimado" type="number" value={editLead.value} onChange={event => setEditLead(prev => ({ ...prev, value: event.target.value }))} />
+                  <Select
+                    label="Status"
+                    value={editLead.status}
+                    onChange={value => setEditLead(prev => ({ ...prev, status: value }))}
+                    options={LEAD_STATUSES.map(status => ({ value: status, label: t(`status.${status}`) }))}
+                  />
+                  <Select
+                    label="Fonte"
+                    value={editLead.source}
+                    onChange={value => setEditLead(prev => ({ ...prev, source: value }))}
+                    options={[
+                      { value: 'LinkedIn', label: 'LinkedIn' },
+                      { value: 'Indicação', label: 'Indicação' },
+                      { value: 'Site', label: 'Site' },
+                      { value: 'Evento', label: 'Evento' },
+                      { value: 'Google Ads', label: 'Google Ads' },
+                      { value: 'Captura Automática', label: 'Captura Automática' },
+                    ]}
+                  />
+                </div>
+                <Textarea
+                  label="Notas internas"
+                  value={editLead.notes}
+                  onChange={event => setEditLead(prev => ({ ...prev, notes: event.target.value }))}
+                  wrapperClassName="mt-md"
+                />
+              </div>
+            ) : (
+              <>
+            <div className="grid grid-2 mb-lg">
+              <div className="input-group">
+                <label className="input-label">{t('common.status')}</label>
+                <div><Badge variant={getStatusType(selectedLead.status)}>{t(`status.${selectedLead.status}`)}</Badge></div>
+              </div>
+              <div className="input-group">
+                <label className="input-label">{t('leads.estimatedValue')}</label>
+                <div className="flex items-center gap-xs">
+                  <span className="font-bold">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedLead.value)}
+                  </span>
+                  {selectedLead.status === 'qualified' && (
+                    <span className="text-success text-xs font-bold" title="High conversion potential">
+                      ↑ 15% Trend
+                    </span>
+                  )}
+                </div>
+                {selectedLead.pricingModel === 'ai_development' && (
+                  <div className="text-xs text-muted mt-xs">
+                    Estimativa ajustada para desenvolvimento com IA. Comercial vinculado: {selectedLead.commercialOwnerName || selectedLead.commercialOwnerEmail || 'não informado'}.
+                  </div>
+                )}
+                {selectedLead.conversionReadiness && (
+                  <div className="text-xs text-muted mt-xs">
+                    Prontidão comercial: {selectedLead.conversionReadiness}/100 · estágio {selectedLead.stage}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-2 gap-lg">
+              <div>
+                <div className="mb-lg">
+                  <label className="input-label">{t('leads.contactInfo')}</label>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-primary font-bold">{selectedLead.contact}</span>
+                    <span className="text-sm text-secondary">{selectedLead.email}</span>
+                    <span className="text-sm text-secondary">{selectedLead.phone}</span>
+                  </div>
+                </div>
+
+                <div className="mb-lg">
+                  <label className="input-label">{t('leads.scorePotential')}</label>
+                  <div className="flex items-center gap-md">
+                    <div className="progress-bar-container">
+                      <div className={`progress-bar-fill ${selectedLead.score > 70 ? 'bg-success' : 'bg-accent'}`} style={{ width: `${selectedLead.score || 75}%` }}></div>
+                    </div>
+                    <span className="text-sm font-bold">{selectedLead.score || 75}/100</span>
+                  </div>
+                </div>
+
+                <div className="mb-lg">
+                  <label className="input-label">{t('leads.internalNotes')}</label>
+                  <div className="notes-box">
+                    {selectedLead.notes || t('leads.defaultNote', 'Interessado em modernização de infraestrutura e consultoria em cloud. Próximo passo: agendar reunião de Discovery.')}
+                  </div>
+                </div>
+                {selectedLead.prospectingPlan && (
+                  <div className="mb-lg">
+                    <label className="input-label">Plano de prospecção</label>
+                    <div className="notes-box">
+                      <strong>{selectedLead.prospectingPlan.offer?.label}</strong>
+                      <ul style={{ paddingLeft: '1rem', marginTop: '.5rem' }}>
+                        {(selectedLead.prospectingPlan.actions || []).slice(0, 3).map(action => (
+                          <li key={action} className="text-xs text-muted mb-xs">{action}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+                {(selectedLead.conversionSignals || []).length > 0 && (
+                  <div className="mb-lg">
+                    <label className="input-label">Sinais de conversão</label>
+                    <div className="flex gap-xs flex-wrap">
+                      {selectedLead.conversionSignals.map(signal => (
+                        <Badge key={signal.key} variant="secondary">{signal.label}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="input-label">{t('leads.activityHistory')}</label>
+                <div className="timeline-container-scrollable">
+                  <Timeline items={getHistory(selectedLead)} />
+                </div>
+                {(selectedLead.interactionHistory || []).length > 0 && (
+                  <div className="mt-lg">
+                    <label className="input-label">Interações registradas</label>
+                    {(selectedLead.interactionHistory || []).slice().reverse().map(item => (
+                      <div key={item.id} className="text-xs text-muted mb-xs">
+                        <strong>{item.type}</strong> · {new Date(item.createdAt).toLocaleString('pt-BR')}<br />
+                        {item.description}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+              </>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={!!leadToDelete}
+        onClose={() => setLeadToDelete(null)}
+        title="Excluir lead"
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setLeadToDelete(null)}>Cancelar</Button>
+            <Button variant="danger" onClick={handleDeleteLead}>Excluir definitivamente</Button>
+          </>
+        }
+      >
+        <p className="text-sm text-secondary">
+          Tem certeza que deseja excluir <strong>{leadToDelete?.company}</strong>? Essa ação remove o lead da listagem e registra a remoção na auditoria.
+        </p>
+      </Modal>
+    </div>
+  );
+};
+
+export default Leads;
