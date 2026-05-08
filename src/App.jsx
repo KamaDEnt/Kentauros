@@ -35,12 +35,7 @@ function App() {
   if (loading) return <div className="loader">Initializing OS...</div>;
 
   if (!user) {
-    return (
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    );
+    return <Login />;
   }
 
   return (
