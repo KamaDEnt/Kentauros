@@ -49,6 +49,13 @@
   "common.notes": "Notas",
   "common.promote": "Promover",
 
+  "login.subtitle": "Automatiza captura, discovery, propuesta, desarrollo y entrega en un único flujo operacional.",
+  "login.identity": "Identidad",
+  "login.accessCode": "Código de acceso",
+  "login.initialize": "Entrar en Kentauros",
+  "login.forgotAccess": "Olvidé mi acceso",
+  "login.securityProtocol": "Protocolo de seguridad",
+
   "dashboard.title": "Visión Operativa",
   "dashboard.subtitle": "Bienvenido de vuelta, Agente. Aquí está el estado actual de Kentauros.",
   "dashboard.activeLeads": "Leads Activos",

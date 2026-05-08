@@ -1,5 +1,7 @@
 export const mockUsers = [
-  { id: 1, tenant_id: 'tenant-a', name: 'Admin Master', email: 'admin@kentauros.com', role: 'admin', tags: ['ADMIN', 'DEV', 'QA', 'UX'], avatar: 'AM', status: 'active', department: 'TI', since: '2022-01-01' },
+  { id: 1, tenant_id: 'tenant-a', name: 'Admin Master', email: 'admin@kentauros.com', role: 'admin', tags: ['ADMIN', 'DEV', 'QA', 'UX'], avatar: 'AM', status: 'active', department: 'TI', since: '2022-01-01', accessCode: 'kentauros-admin' },
+  { id: 13, tenant_id: 'tenant-a', name: 'Admin Kentauros', email: 'admin@kentauros.consulting', role: 'admin', tags: ['ADMIN', 'DEV', 'QA', 'UX', 'DEVOPS'], avatar: 'AK', status: 'active', department: 'Administração', since: '2026-05-08', accessCode: 'kentauros-admin' },
+  { id: 14, tenant_id: 'tenant-a', name: 'Admin Operacional', email: 'operacional@kentauros.consulting', role: 'admin', tags: ['ADMIN', 'COMERCIAL', 'DEV', 'QA', 'UX'], avatar: 'AO', status: 'active', department: 'Operações', since: '2026-05-08', accessCode: 'kentauros-admin' },
   { id: 2, tenant_id: 'tenant-b', name: 'Carlos Vendas', email: 'carlos@kentauros.com', role: 'comercial', tags: ['COMERCIAL'], avatar: 'CV', status: 'active', department: 'Comercial', since: '2022-03-15' },
   { id: 3, tenant_id: 'tenant-a', name: 'Ana Pré-Venda', email: 'ana@kentauros.com', role: 'prevendas', tags: ['COMERCIAL'], avatar: 'AP', status: 'active', department: 'Comercial', since: '2022-06-01' },
   { id: 4, tenant_id: 'tenant-b', name: 'Bruno BA', email: 'bruno@kentauros.com', role: 'ba', tags: ['ADMIN'], avatar: 'BB', status: 'active', department: 'Tecnologia', since: '2021-11-01' },

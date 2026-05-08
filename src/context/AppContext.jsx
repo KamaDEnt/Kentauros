@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { mockUsers } from '../data/mock-users';
 import { supabase } from '../services/supabaseClient';
 
@@ -9,8 +9,17 @@ export const AppProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
 
+  const addNotification = (title, message, type = 'info') => {
+    const id = Date.now();
+    setNotifications(prev => [...prev, { id, title, message, type }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 5000);
+  };
+
   const syncUserProfile = async (profile) => {
     try {
+      const { accessCode, ...safeProfile } = profile;
       await supabase.from('user_profiles').upsert({
         id: profile.id,
         tenant_id: profile.tenant_id,
@@ -19,7 +28,7 @@ export const AppProvider = ({ children }) => {
         role: profile.role,
         tags: profile.tags || [profile.role?.toUpperCase()].filter(Boolean),
         status: profile.status || 'active',
-        metadata: profile,
+        metadata: safeProfile,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'id' });
     } catch (error) {
@@ -28,7 +37,6 @@ export const AppProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    // Simular auto-login com o Admin para facilitar o desenvolvimento
     const savedUser = localStorage.getItem('kentauros_user');
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
@@ -37,27 +45,28 @@ export const AppProvider = ({ children }) => {
       setUser(nextUser);
       localStorage.setItem('kentauros_user', JSON.stringify(nextUser));
       syncUserProfile(nextUser);
-    } else {
-      // Padrão: Admin
-      const admin = mockUsers.find(u => u.role === 'admin');
-      setUser(admin);
-      localStorage.setItem('kentauros_user', JSON.stringify(admin));
-      syncUserProfile(admin);
     }
     setLoading(false);
   }, []);
 
   const login = (credentials) => {
-    const email = typeof credentials === 'string' ? credentials : credentials?.email;
-    const normalizedEmail = email === 'admin@kentauros.consulting' ? 'admin@kentauros.com' : email;
-    const foundUser = mockUsers.find(u => u.email === normalizedEmail);
+    const email = (typeof credentials === 'string' ? credentials : credentials?.email || '').trim().toLowerCase();
+    const password = typeof credentials === 'string' ? '' : credentials?.password || '';
+    const foundUser = mockUsers.find(u => u.email.toLowerCase() === email);
+
     if (foundUser) {
+      if (foundUser.accessCode && foundUser.accessCode !== password) {
+        addNotification('Erro', 'Código de acesso inválido', 'error');
+        return false;
+      }
+
       setUser(foundUser);
       localStorage.setItem('kentauros_user', JSON.stringify(foundUser));
       syncUserProfile(foundUser);
       addNotification('Sucesso', `Bem-vindo de volta, ${foundUser.name}!`, 'success');
       return true;
     }
+
     addNotification('Erro', 'Usuário não encontrado', 'error');
     return false;
   };
@@ -65,14 +74,6 @@ export const AppProvider = ({ children }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('kentauros_user');
-  };
-
-  const addNotification = (title, message, type = 'info') => {
-    const id = Date.now();
-    setNotifications(prev => [...prev, { id, title, message, type }]);
-    setTimeout(() => {
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    }, 5000);
   };
 
   return (

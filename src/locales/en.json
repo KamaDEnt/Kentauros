@@ -49,6 +49,13 @@
   "common.notes": "Notes",
   "common.promote": "Promote",
 
+  "login.subtitle": "Automate lead capture, discovery, proposal, development, and delivery in one operational flow.",
+  "login.identity": "Identity",
+  "login.accessCode": "Access code",
+  "login.initialize": "Enter Kentauros",
+  "login.forgotAccess": "Forgot access",
+  "login.securityProtocol": "Security protocol",
+
   "dashboard.title": "Operational Overview",
   "dashboard.subtitle": "Welcome back, Agent. Here is the current state of Kentauros.",
   "dashboard.activeLeads": "Active Leads",
