@@ -1542,6 +1542,18 @@ code, .font-mono { font-family: var(--font-mono); }
   justify-content: center;
 }
 
+.capture-failure-message {
+  margin: var(--sp-4) auto;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-md);
+  background: var(--danger-dim);
+  color: var(--danger);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 /* ── Select (Custom) ── */
 .select-wrapper { display: flex; flex-direction: column; gap: var(--sp-2); width: 100%; position: relative; }
 .select-trigger {

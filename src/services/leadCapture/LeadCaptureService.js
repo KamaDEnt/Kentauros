@@ -41,6 +41,44 @@ export class LeadCaptureService {
     return () => clearInterval(interval);
   }
 
+  async requestBackendCapture(config) {
+    const response = await fetch(`${this.baseUrl}/api/capture-leads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || 'Capture backend failed');
+    }
+
+    return Array.isArray(payload.leads) ? payload.leads : [];
+  }
+
+  async captureWithFallback(config) {
+    try {
+      return await this.requestBackendCapture(config);
+    } catch (error) {
+      const relaxedConfig = {
+        ...config,
+        contactRequirements: {
+          ...(config.contactRequirements || {}),
+          email: false,
+          phone: false,
+          whatsapp: false,
+          website: true,
+        },
+      };
+
+      try {
+        return await this.requestBackendCapture(relaxedConfig);
+      } catch {
+        throw error;
+      }
+    }
+  }
+
   async runJob(jobId, config) {
     const { contactRequirements, captureMetric, quantity } = config;
     let stopProgressPulse = () => {};
@@ -54,18 +92,7 @@ export class LeadCaptureService {
       });
       stopProgressPulse = this.startProgressPulse(jobId, quantity);
 
-      const response = await fetch(`${this.baseUrl}/api/capture-leads`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-      });
-
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload.error || 'Capture backend failed');
-      }
-
-      const allFound = Array.isArray(payload.leads) ? payload.leads : [];
+      const allFound = await this.captureWithFallback(config);
       stopProgressPulse();
       this.dataProvider.updateCaptureJob(jobId, {
         progress: 92,
@@ -102,7 +129,7 @@ export class LeadCaptureService {
 
       const totalValid = finalizedLeads.length;
       if (totalValid === 0) {
-        throw new Error('No valid leads captured');
+        throw new Error('Nenhum lead qualificado encontrado para os filtros selecionados.');
       }
 
       this.dataProvider.addCaptureResults(jobId, finalizedLeads);
@@ -115,7 +142,12 @@ export class LeadCaptureService {
     } catch (error) {
       stopProgressPulse();
       console.error('Lead Capture Job Failed:', error);
-      this.dataProvider.updateCaptureJob(jobId, { status: 'failed' });
+      this.dataProvider.updateCaptureJob(jobId, {
+        status: 'failed',
+        progress: 100,
+        phaseLabel: 'Captura interrompida',
+        error: error.message || 'Falha ao capturar leads',
+      });
     }
   }
 }

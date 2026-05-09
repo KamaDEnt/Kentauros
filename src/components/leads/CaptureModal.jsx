@@ -193,10 +193,9 @@ const CaptureModal = ({ isOpen, onClose }) => {
       setTimeout(() => setStep(3), 800);
     }
     if (currentJob?.status === 'failed' && step === 2) {
-      addNotification(t('common.error'), 'A captura falhou. Tente novamente.', 'error');
-      setStep(1);
+      addNotification(t('common.error'), currentJob?.error || 'A captura falhou. Revise os filtros ou tente novamente.', 'error');
     }
-  }, [currentJob?.status, step, addNotification, t]);
+  }, [currentJob?.status, currentJob?.error, step, addNotification, t]);
 
   useEffect(() => {
     if (resultsPage !== paginatedResults.currentPage) {
@@ -576,6 +575,11 @@ const CaptureModal = ({ isOpen, onClose }) => {
         <p className="text-muted text-sm mb-3">
           {capturePhaseLabel}
         </p>
+        {currentJob?.status === 'failed' && (
+          <div className="capture-failure-message">
+            {currentJob?.error || 'Nao foi possivel concluir a captura com os filtros atuais.'}
+          </div>
+        )}
         <p className="text-muted text-xs mb-8">
           {config.niche} em {config.location} · meta de {config.quantity} leads qualificados
         </p>
@@ -876,6 +880,12 @@ const CaptureModal = ({ isOpen, onClose }) => {
             )}
           </div>
           <div className="flex gap-3">
+            {step === 2 && currentJob?.status === 'failed' && (
+              <Button variant="secondary" onClick={() => setStep(1)} icon={ChevronLeft}>
+                Voltar
+              </Button>
+            )}
+
             {step > 2 && step !== 5 && (
               <Button variant="secondary" onClick={handleGoBack} icon={ChevronLeft}>
                 Voltar
@@ -897,6 +907,12 @@ const CaptureModal = ({ isOpen, onClose }) => {
             {step === 1 && (
               <Button variant="success" onClick={handleStartCapture} icon={Zap}>
                 {t('leads.capture.modal.start')}
+              </Button>
+            )}
+
+            {step === 2 && currentJob?.status === 'failed' && (
+              <Button variant="success" onClick={handleStartCapture} icon={Zap}>
+                Tentar novamente
               </Button>
             )}
             
