@@ -25,6 +25,7 @@ const emptyMeetingForm = {
   rulesText: '',
   tagsText: '',
   recordings: [],
+  estimatedValue: 0,
 };
 
 const linesToArray = (value) => String(value || '').split('\n').map(item => item.trim()).filter(Boolean);
@@ -59,6 +60,7 @@ const Discovery = () => {
       tagsText: (discovery.tags || []).join(', '),
       recordings: discovery.recordings || [],
       transcriptFile: discovery.transcriptFile || null,
+      estimatedValue: discovery.estimatedValue || discovery.value || 0,
     });
   };
 
@@ -153,6 +155,7 @@ const Discovery = () => {
       rules: linesToArray(meetingForm.rulesText),
       tags: String(meetingForm.tagsText || '').split(',').map(item => item.trim()).filter(Boolean),
       recordings: meetingForm.recordings || [],
+      estimatedValue: Number(meetingForm.estimatedValue || 0),
       updatedAt: new Date().toISOString(),
     };
 
@@ -389,6 +392,13 @@ const Discovery = () => {
                 { value: 'awaiting_approval', label: 'Aguardando aprovação' },
                 { value: 'approved', label: 'Aprovado' },
               ]}
+            />
+            <Input
+              label="Valor estimado (BRL)"
+              type="number"
+              value={meetingForm.estimatedValue}
+              onChange={event => setMeetingForm(prev => ({ ...prev, estimatedValue: event.target.value }))}
+              placeholder="Ex: 120000"
             />
           </div>
 
