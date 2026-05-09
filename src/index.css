@@ -547,6 +547,40 @@ code, .font-mono { font-family: var(--font-mono); }
 .search-box input::placeholder {
   color: var(--text-muted);
 }
+.search-box input::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+.global-search-counter {
+  flex: 0 0 auto;
+  min-width: 44px;
+  padding: 3px var(--sp-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  background: var(--k-gold-dim);
+  color: var(--k-gold-300);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+.global-search-counter:hover {
+  border-color: var(--k-gold-500);
+  color: var(--k-gold-100);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.10);
+}
+.global-search-highlight {
+  padding: 0 2px;
+  border-radius: 4px;
+  background: rgba(212, 175, 55, 0.28);
+  color: var(--k-gold-100);
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.28);
+}
+.global-search-highlight.is-active {
+  background: var(--k-gold-500);
+  color: var(--bg-base);
+  box-shadow: var(--k-gold-glow);
+}
 .top-bar-right {
   display: flex;
   align-items: center;
