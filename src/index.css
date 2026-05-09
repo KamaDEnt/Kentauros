@@ -616,9 +616,23 @@ code, .font-mono { font-family: var(--font-mono); }
   background: var(--border-default);
 }
 .user-profile {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--sp-3);
+  padding: var(--sp-2);
+  margin: calc(var(--sp-2) * -1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+.user-profile:hover,
+.user-profile:focus-visible,
+.user-profile[aria-expanded="true"] {
+  border-color: var(--border-default);
+  background: var(--bg-surface);
+  outline: none;
 }
 .user-info {
   display: flex;
@@ -651,6 +665,56 @@ code, .font-mono { font-family: var(--font-mono); }
 .logout-btn:hover {
   color: var(--danger);
   background: var(--danger-dim);
+}
+.user-profile > .logout-btn {
+  display: none;
+}
+.user-profile-chevron {
+  color: var(--text-muted);
+  transition: transform var(--duration-fast), color var(--duration-fast);
+}
+.user-profile[aria-expanded="true"] .user-profile-chevron {
+  color: var(--k-gold-500);
+  transform: rotate(180deg);
+}
+.user-profile-menu {
+  position: absolute;
+  top: calc(100% + var(--sp-3));
+  right: 0;
+  z-index: 60;
+  width: 240px;
+  padding: var(--sp-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-lg);
+}
+.user-profile-menu-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-2) var(--sp-3);
+  margin-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.logout-menu-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--duration-fast);
+}
+.logout-menu-btn:hover {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: var(--danger-dim);
+  color: var(--danger);
 }
 
 

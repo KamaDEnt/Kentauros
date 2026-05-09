@@ -85,7 +85,9 @@ const TopBar = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [matchCount, setMatchCount] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [profileOpen, setProfileOpen] = useState(false);
   const searchTimer = useRef(null);
+  const profileMenuRef = useRef(null);
 
   useEffect(() => {
     window.clearTimeout(searchTimer.current);
@@ -106,6 +108,28 @@ const TopBar = () => {
   }, [searchTerm, location.pathname]);
 
   useEffect(() => () => clearSearchMarks(), []);
+
+  useEffect(() => {
+    if (!profileOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
+        setProfileOpen(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') setProfileOpen(false);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [profileOpen]);
 
   const handleSearchSubmit = (event) => {
     event.preventDefault();
@@ -164,7 +188,22 @@ const TopBar = () => {
 
         <div className="divider-v" aria-hidden="true" />
 
-        <div className="user-profile">
+        <div
+          className="user-profile"
+          ref={profileMenuRef}
+          role="button"
+          tabIndex={0}
+          aria-label="Abrir perfil do usuario"
+          aria-haspopup="menu"
+          aria-expanded={profileOpen}
+          onClick={() => setProfileOpen(open => !open)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              setProfileOpen(open => !open);
+            }
+          }}
+        >
           <div className="user-info">
             <span className="user-name">{user?.name}</span>
             <span className="user-role">{user?.role} • {scope}</span>
@@ -177,6 +216,33 @@ const TopBar = () => {
               <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
           </button>
+          <svg className="user-profile-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+          {profileOpen && (
+            <div className="user-profile-menu" role="menu" onClick={(event) => event.stopPropagation()}>
+              <div className="user-profile-menu-header">
+                <span className="user-name">{user?.name}</span>
+                <span className="user-role">{user?.role} - {scope}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setProfileOpen(false);
+                  logout();
+                }}
+                className="logout-menu-btn"
+                role="menuitem"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                Sair da conta
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>
