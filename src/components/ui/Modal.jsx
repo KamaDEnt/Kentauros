@@ -4,22 +4,26 @@ import Button from './Button';
 
 const Modal = ({ isOpen, onClose, title, children, actions, size = 'md' }) => {
   const modalRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleEscape = (e) => { if (e.key === 'Escape') onClose(); };
+    const handleEscape = (e) => { if (e.key === 'Escape') onCloseRef.current?.(); };
     document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', handleEscape);
 
-    // Focus trap - focus modal on open
     if (modalRef.current) modalRef.current.focus();
 
     return () => {
       document.body.style.overflow = 'unset';
       window.removeEventListener('keydown', handleEscape);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
