@@ -57,6 +57,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--sp-3);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -64,9 +65,27 @@
   display: flex;
   align-items: center;
   gap: var(--sp-3);
+  min-width: 0;
+  flex: 1;
   font-weight: 700;
   font-size: var(--text-sm);
   color: var(--text-primary);
+}
+
+.kanban-column-title > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kanban-column-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-1);
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .kanban-column-count {

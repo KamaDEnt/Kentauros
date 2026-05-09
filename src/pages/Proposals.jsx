@@ -204,22 +204,22 @@ const Proposals = () => {
         actions={<Button variant="primary" onClick={handleGenerateProposal}>Gerar proposta</Button>}
       />
 
-      <Card className="mb-xl">
-        <div className="grid grid-2">
+      <Card className="mb-xl proposal-base-panel">
+        <div className="proposal-base-grid">
           <Select
             label="Cliente com reuniao realizada"
             value={selectedDiscoveryId}
             onChange={setSelectedDiscoveryId}
             options={meetingClients.map(item => ({ value: item.id, label: `${item.clientName} - ${item.status}` }))}
           />
-          <div>
+          <div className="proposal-base-summary">
             <div className="text-xs text-muted mb-xs">Base da proposta</div>
             <p className="text-sm text-secondary">{selectedMeeting?.summary || 'Nenhuma reuniao aprovada encontrada.'}</p>
           </div>
         </div>
       </Card>
 
-      <div className="grid grid-3 mb-xl">
+      <div className="proposal-stats-grid mb-xl">
         <StatCard label="Pipeline total" value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(proposals.reduce((acc, p) => acc + Number(p.value || 0), 0))} />
         <StatCard label="Aguardando assinatura" value={proposals.filter(p => ['sent', 'draft'].includes(p.status)).length} />
         <StatCard label="Assinadas" value={proposals.filter(p => ['approved', 'signed', 'won'].includes(p.status)).length} />

@@ -23,14 +23,15 @@ const KanbanColumn = ({ column, cards, onCardClick, onAddCard }) => {
           <span>{column.name}</span>
           <span className="kanban-column-count">{cards.length}</span>
         </div>
-        <div className="flex gap-1">
+        <div className="kanban-column-actions">
           <button 
             className="btn-ghost btn-icon btn-sm" 
             onClick={() => onAddCard(column.id)}
+            aria-label={`Adicionar card em ${column.name}`}
           >
             <Plus size={16} />
           </button>
-          <button className="btn-ghost btn-icon btn-sm">
+          <button className="btn-ghost btn-icon btn-sm" aria-label={`Mais opções de ${column.name}`}>
             <MoreHorizontal size={16} />
           </button>
         </div>
