@@ -38,7 +38,7 @@ const meetingStatusLabels = {
 const formatMeetingStatus = (value) => meetingStatusLabels[value] || String(value || 'Sem status').replaceAll('_', ' ');
 
 const Discovery = () => {
-  const { discoveries = [], addDiscovery, updateDiscovery, deleteDiscovery, addLearningEvent } = useData();
+  const { discoveries = [], addDiscovery, updateDiscovery, deleteDiscovery, updateLead, addLearningEvent } = useData();
   const { user, addNotification } = useApp();
   const knowledge = useMemo(() => deriveDiscoveryKnowledge(discoveries), [discoveries]);
   const [selectedDiscovery, setSelectedDiscovery] = useState(null);
@@ -160,6 +160,11 @@ const Discovery = () => {
     };
 
     updateDiscovery(selectedDiscovery.id, payload);
+    
+    // Sync back to Lead if exists
+    if (selectedDiscovery.leadId) {
+      updateLead(selectedDiscovery.leadId, { value: payload.estimatedValue });
+    }
     addLearningEvent({
       source: 'meeting',
       event_type: 'meeting_knowledge_updated',

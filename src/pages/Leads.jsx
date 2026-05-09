@@ -21,7 +21,7 @@ const LEAD_STATUSES = ['new', 'qualified', 'discovery', 'proposal', 'won', 'lost
 
 const Leads = () => {
   const { t } = useI18n();
-  const { leads, addLead, updateLead, deleteLead } = useData();
+  const { leads, addLead, updateLead, deleteLead, discoveries, updateDiscovery } = useData();
   const { user, addNotification } = useApp();
   const { promoteLeadToDiscovery } = useWorkflow();
   const [statusFilter, setStatusFilter] = useState('all');
@@ -161,6 +161,13 @@ const Leads = () => {
       ],
     };
     updateLead(selectedLead.id, updated);
+    
+    // Sync with Discovery if exists
+    const associatedDiscovery = discoveries.find(d => d.leadId === selectedLead.id);
+    if (associatedDiscovery) {
+      updateDiscovery(associatedDiscovery.id, { estimatedValue: updated.value });
+    }
+
     setSelectedLead({ ...selectedLead, ...updated });
     setIsEditingLead(false);
     setEditLead(null);
