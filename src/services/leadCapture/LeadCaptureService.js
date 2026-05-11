@@ -1,3 +1,4 @@
+// Lead Capture Service - Full implementation with real search
 import {
   analyzeLeadForMetric,
   calculateAiDevelopmentEstimatedValue,
@@ -6,16 +7,36 @@ import {
 import { buildProspectingPlan, getLeadConversionSignals } from './leadConversionStrategy.js';
 
 const BLOCKED_DOMAINS = [
-  'google.', 'bing.', 'facebook.', 'instagram.', 'linkedin.', 'youtube.', 'tiktok.',
-  'twitter.', 'x.com', 'reclameaqui.', 'jusbrasil.', 'doctoralia.', 'boaconsulta.',
-  'guiamais.', 'telelistas.', 'apontador.', 'tripadvisor.', 'wikipedia.',
-  'mercadolivre.', 'olx.', 'zapimoveis.', 'vivareal.', 'webmotors.',
-  'noticias', 'blogspot.', 'medium.com', 'wordpress.com', 'gov.br',
-  'baidu.', 'yahoo.', 'pinterest.', 'reddit.', 'quora.', 'archive.',
-  'boaempresa.', 'gympass.', 'wellhub.', 'helpcenter.', 'encontra', 'guiado',
+  'google.com', 'google.com.br', 'bing.com', 'facebook.com', 'instagram.com',
+  'linkedin.com', 'youtube.com', 'tiktok.com', 'twitter.com', 'x.com',
+  'wikipedia.org', 'github.com', 'stackoverflow.com', 'reddit.com',
+  'mercadolivre.com.br', 'olx.com.br', 'amazon.com.br', 'shopee.com.br',
+  'globo.com', 'uol.com.br', 'terra.com.br', 'ig.com.br',
+  'gov.br', 'gmail.com', 'hotmail.com', 'outlook.com',
+  'booking.com', 'tripadvisor.com', 'airbnb.com',
+  'pinterest.com', 'quora.com', 'medium.com', 'wordpress.com',
 ];
 
-const normalizeWebsiteUrl = (rawUrl = '') => {
+const NICHE_BLOCKLIST = {
+  default: ['guiamais.com.br', 'telelistas.net', 'apontador.com.br', 'wisemap.com.br', 'waze.com'],
+  'escritórios de advocacia': ['juris.com.br', 'jurisprudencia.com.br', 'diariojuridico.com.br'],
+  'clínicas médicas': ['doctoralia.com.br', 'boaconsulta.com.br', 'saude.vivo.com.br'],
+  'restaurantes': ['tripadvisor.com', 'google.com/maps', 'guia123.com.br'],
+  'imobiliárias': ['zapimoveis.com.br', 'vivareal.com.br', 'imovelweb.com.br', 'webmotors.com.br'],
+};
+
+const getBlockedForNiche = (niche) => {
+  const normalized = (niche || '').toLowerCase();
+  let list = [...BLOCKED_DOMAINS];
+  for (const [key, domains] of Object.entries(NICHE_BLOCKLIST)) {
+    if (normalized.includes(key)) {
+      list = [...list, ...domains];
+    }
+  }
+  return list;
+};
+
+const normalizeWebsite = (rawUrl) => {
   if (!rawUrl) return null;
   try {
     let value = String(rawUrl).trim();
@@ -26,14 +47,26 @@ const normalizeWebsiteUrl = (rawUrl = '') => {
     }
     const url = new URL(value.startsWith('http') ? value : `https://${value}`);
     url.hash = '';
-    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid'].forEach(key => url.searchParams.delete(key));
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid'].forEach(k => url.searchParams.delete(k));
     if (!['http:', 'https:'].includes(url.protocol)) return null;
     const hostname = url.hostname.toLowerCase().replace(/^www\./, '');
-    if (hostname.length < 4 || !hostname.includes('.') || BLOCKED_DOMAINS.some(domain => hostname.includes(domain))) return null;
     return `${url.protocol}//${hostname}${url.pathname === '/' ? '' : url.pathname}`.replace(/\/$/, '');
   } catch {
     return null;
   }
+};
+
+const scoreFromData = (lead, captureMetric) => {
+  let score = 50;
+  if (lead.email) score += 20;
+  if (lead.phone) score += 10;
+  if (lead.meta?.title) score += 5;
+  if (lead.meta?.description) score += 5;
+  if (lead.phones?.length > 1) score += 5;
+  if (lead.emails?.length > 1) score += 5;
+  const hasGoodContact = lead.email || lead.phone;
+  if (!hasGoodContact) score -= 30;
+  return Math.min(100, Math.max(10, score));
 };
 
 export class LeadCaptureService {
@@ -47,123 +80,146 @@ export class LeadCaptureService {
   }
 
   async realCapture(config) {
-    const { niche, location, quantity = 20 } = config;
+    const { niche, location, quantity = 20, captureMetric = 'website_reformulation' } = config;
     const results = [];
+    const seen = new Set();
+    const blocked = getBlockedForNiche(niche);
 
-    // Try the serverless API first
+    // Search queries based on niche and location
+    const searchQueries = [
+      `${niche} ${location} empresa contato`,
+      `${niche} ${location} site oficial`,
+      `${niche} ${location} orçamento`,
+    ];
+
     const doSearch = async (query) => {
-      const apiPath = `/api/search?q=${encodeURIComponent(query)}`;
       try {
+        const apiPath = `/api/search?q=${encodeURIComponent(query)}`;
         const response = await fetch(apiPath, {
           method: 'GET',
-          signal: AbortSignal.timeout(20000),
+          signal: AbortSignal.timeout(25000),
         });
         if (response?.ok) {
           const data = await response.json();
-          return data.html || '';
+          return data.results || [];
         }
-      } catch {}
-      return null;
+      } catch (err) {
+        console.warn('[LeadCapture] Search failed:', err.message);
+      }
+      return [];
     };
 
-    // Search via proxy
-    const html = await doSearch(`${niche} ${location} site:com.br`);
+    const doFetchSite = async (website) => {
+      try {
+        const response = await fetch(`/api/fetch-site?url=${encodeURIComponent(website)}`, {
+          signal: AbortSignal.timeout(15000),
+        });
+        if (response?.ok) {
+          return await response.json();
+        }
+      } catch {}
+      return { emails: [], phones: [], meta: {} };
+    };
 
-    if (html && html.length > 500) {
-      // Parse real results from HTML
-      const seen = new Set();
-      const linkRegex = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-      let match;
+    for (const query of searchQueries) {
+      if (results.length >= quantity) break;
 
-      while ((match = linkRegex.exec(html)) !== null && results.length < quantity) {
-        const href = match[1];
-        const title = match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-        const website = normalizeWebsiteUrl(href);
+      const searchResults = await doSearch(query);
+      console.log(`[LeadCapture] Query "${query}" returned ${searchResults.length} results`);
 
-        if (!website || seen.has(website) || title.length < 3) continue;
-        if (BLOCKED_DOMAINS.some(d => website.includes(d))) continue;
+      for (const item of searchResults) {
+        if (results.length >= quantity) break;
 
-        seen.add(website);
+        const website = normalizeWebsite(item.link);
+        if (!website) continue;
 
-        // Fetch site contacts
-        let emails = [], phones = [];
-        try {
-          const siteRes = await fetch(`/api/fetch-site?url=${encodeURIComponent(website)}`, {
-            signal: AbortSignal.timeout(10000),
-          });
-          if (siteRes?.ok) {
-            const d = await siteRes.json();
-            emails = d.emails || [];
-            phones = d.phones || [];
-          }
-        } catch {}
+        const hostname = new URL(website).hostname.replace('www.', '');
+        if (blocked.some(d => hostname.includes(d))) continue;
+        if (seen.has(hostname)) continue;
+        seen.add(hostname);
+
+        // Fetch site data
+        const siteData = await doFetchSite(website);
+        const score = scoreFromData({ ...item, ...siteData }, captureMetric);
 
         results.push({
           id: `lead_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-          name: title,
-          company: title,
+          name: item.title || hostname,
+          company: item.title || hostname,
           website: website,
-          email: emails[0] || null,
-          phone: phones[0] || null,
-          whatsapp: phones.find(p => p.length === 11) || null,
-          source: 'Web Search',
+          email: siteData.emails?.[0] || null,
+          phone: siteData.phones?.[0] || null,
+          whatsapp: siteData.phones?.find(p => p.length === 11) || null,
+          emails: siteData.emails || [],
+          phones: siteData.phones || [],
+          meta: siteData.meta || {},
+          source: item.source || 'Web Search',
+          snippet: item.snippet || '',
           status: 'qualified',
-          isValid: true,
+          isValid: Boolean(siteData.emails?.[0] || siteData.phones?.[0]),
           isActive: true,
           location: location,
           industry: niche,
-          score: Math.floor(Math.random() * 30 + 70),
-          estimatedValue: Math.floor(Math.random() * 50000 + 15000),
-          captureMetric: config.captureMetric || niche,
-          metricCategory: config.captureMetric || niche,
+          score: score,
+          estimatedValue: calculateAiDevelopmentEstimatedValue({ industry: niche, website, hasEmail: !!siteData.emails?.[0], hasPhone: !!siteData.phones?.[0] }, captureMetric),
+          captureMetric: captureMetric,
+          metricCategory: captureMetric,
+          identifiedIssues: analyzeLeadForMetric({ website, industry: niche, hasEmail: !!siteData.emails?.[0] }, captureMetric).issues,
+          conversionSignals: getLeadConversionSignals({ website, industry: niche, score }, captureMetric),
+          prospectingPlan: buildProspectingPlan({ website, industry: niche, score }, captureMetric),
         });
       }
     }
 
-    // If no real results, generate demo leads
+    // If no real results, generate realistic demo leads
     if (results.length === 0) {
-      console.warn('[LeadCapture] No real results, generating demo leads');
-      const cities = location.split(',').map(s => s.trim());
-      const city = cities[0] || 'SP';
-      const state = cities[1] || '';
+      console.warn('[LeadCapture] No results from search, generating demo leads');
+      const cityPart = location.split(',')[0]?.trim() || 'São Paulo';
+      const statePart = location.split(',')[1]?.trim() || 'SP';
 
-      const companyTypes = niche.split(' ').slice(-1)[0] || 'Empresa';
-      const companyNames = [
-        `${city} ${companyTypes} Ltda`,
-        `Grupo ${city} ${companyTypes}`,
-        `${city} Consultoria em ${niche}`,
-        `Solutions ${state} ${companyTypes}`,
-        `${city} Digital Services`,
-        `Inova ${city} Tecnologia`,
-        `Conecta ${city} Solutions`,
-        `Digital ${state} ${companyTypes}`,
-        `${city} Innovation Group`,
-        `Tech ${city} Solutions`,
-        `${niche} ${city} Expert`,
-        `Consultoria ${city} BR`,
+      const demoCompanies = [
+        { name: `Instituto ${cityPart} ${niche.split(' ').pop()}`, domain: `instituto${cityPart.toLowerCase().replace(/\s/g, '')}` },
+        { name: `Centro de ${niche} ${cityPart}`, domain: `centro${niche.split(' ').pop().toLowerCase()}${cityPart.toLowerCase().replace(/\s/g, '')}` },
+        { name: `Grupo ${statePart} ${niche.split(' ')[0]}`, domain: `grupo${statePart.toLowerCase()}${niche.split(' ')[0].toLowerCase()}` },
+        { name: `Consultoria ${cityPart} ${niche.split(' ').pop()}`, domain: `consultoria${cityPart.toLowerCase().replace(/\s/g, '')}` },
+        { name: `Solutions ${cityPart} Tech`, domain: `solutions${cityPart.toLowerCase().replace(/\s/g, '')}tech` },
+        { name: `Digital ${statePart} ${niche.split(' ')[0]}`, domain: `digital${statePart.toLowerCase()}${niche.split(' ')[0].toLowerCase()}` },
+        { name: `${niche.split(' ').pop()} ${cityPart} Sistemas`, domain: `${niche.split(' ').pop().toLowerCase()}${cityPart.toLowerCase().replace(/\s/g, '')}` },
+        { name: `Inovação ${cityPart} Digital`, domain: `inovacao${cityPart.toLowerCase().replace(/\s/g, '')}digital` },
+        { name: `Proficional ${statePart} ${niche.split(' ').pop()}`, domain: `proficional${statePart.toLowerCase()}` },
+        { name: `Serviços ${cityPart} BR`, domain: `servicos${cityPart.toLowerCase().replace(/\s/g, '')}br` },
+        { name: `${niche} ${statePart} Experts`, domain: `${niche.split(' ')[0].toLowerCase()}${statePart.toLowerCase()}experts` },
+        { name: `${cityPart} ${niche.split(' ').pop()} Group`, domain: `${cityPart.toLowerCase().replace(/\s/g, '')}${niche.split(' ').pop().toLowerCase()}group` },
       ];
 
-      for (let i = 0; i < quantity && i < companyNames.length; i++) {
-        const name = companyNames[i];
-        const domain = name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 20);
+      for (let i = 0; i < quantity && i < demoCompanies.length; i++) {
+        const c = demoCompanies[i];
+        const score = Math.floor(55 + Math.random() * 40);
         results.push({
           id: `lead_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-          name: name,
-          company: name,
-          website: `https://${domain}.com.br`,
-          email: `contato@${domain}.com.br`,
-          phone: `119${Math.floor(9000 + Math.random() * 999).toString().padStart(4, '0')}${Math.floor(1000 + Math.random() * 8999).toString()}`,
-          whatsapp: null,
-          source: 'Demo Data',
+          name: c.name,
+          company: c.name,
+          website: `https://${c.domain}.com.br`,
+          email: `contato@${c.domain}.com.br`,
+          phone: `119${Math.floor(9000 + Math.random() * 999)}`,
+          whatsapp: `119${Math.floor(9000 + Math.random() * 999)}`,
+          emails: [`contato@${c.domain}.com.br`, `info@${c.domain}.com.br`],
+          phones: [`119${Math.floor(9000 + Math.random() * 999)}`, `119${Math.floor(8000 + Math.random() * 999)}`],
+          meta: { title: c.name, description: `Especialistas em ${niche} em ${location}` },
+          source: 'Demo (Search Unavailable)',
+          snippet: `Especialistas em ${niche} em ${location}`,
           status: 'qualified',
           isValid: true,
           isActive: true,
           location: location,
           industry: niche,
-          score: Math.floor(60 + Math.random() * 35),
-          estimatedValue: Math.floor(15000 + Math.random() * 80000),
-          captureMetric: config.captureMetric || niche,
-          metricCategory: config.captureMetric || niche,
+          score: score,
+          estimatedValue: Math.floor(15000 + score * 600),
+          captureMetric: captureMetric,
+          metricCategory: captureMetric,
+          identifiedIssues: analyzeLeadForMetric({ website: `https://${c.domain}.com.br`, industry: niche }, captureMetric).issues,
+          conversionSignals: getLeadConversionSignals({ website: `https://${c.domain}.com.br`, industry: niche, score }, captureMetric),
+          prospectingPlan: buildProspectingPlan({ website: `https://${c.domain}.com.br`, industry: niche, score }, captureMetric),
         });
       }
     }
@@ -172,39 +228,31 @@ export class LeadCaptureService {
   }
 
   startProgressPulse(jobId, quantity) {
-    const target = Math.max(1, Number(quantity || 10));
     const phases = [
       { max: 18, label: 'Preparando fontes de captura' },
-      { max: 42, label: 'Consultando Google Maps e buscadores' },
-      { max: 68, label: 'Validando sites oficiais' },
-      { max: 88, label: 'Extraindo contatos e qualificando leads' },
-      { max: 94, label: 'Calculando score de qualidade' },
+      { max: 42, label: 'Buscando no Google e Bing' },
+      { max: 68, label: 'Validando sites e extraindo contatos' },
+      { max: 88, label: 'Calculando score e qualificando leads' },
+      { max: 94, label: 'Finalizando qualificação' },
     ];
     let progress = 8;
     let totalFound = 0;
 
     const interval = setInterval(() => {
-      const phase = phases.find(item => progress < item.max) || phases[phases.length - 1];
+      const phase = phases.find(p => progress < p.max) || phases[phases.length - 1];
       progress = Math.min(94, progress + (progress < 42 ? 4 : progress < 68 ? 3 : 2));
-      totalFound = Math.min(target, totalFound + (progress > 35 ? Math.max(1, Math.round(target / 10)) : 0));
-      this.dataProvider.updateCaptureJob(jobId, {
-        progress,
-        total_found: totalFound,
-        phaseLabel: phase.label,
-      });
+      totalFound = Math.min(quantity, totalFound + (progress > 35 ? Math.max(1, Math.round(quantity / 10)) : 0));
+      this.dataProvider.updateCaptureJob(jobId, { progress, total_found: totalFound, phaseLabel: phase.label });
     }, 1800);
 
     return () => clearInterval(interval);
   }
 
   async requestBackendCapture(config) {
-    if (!this.baseUrl) {
-      throw new Error('Backend not configured');
-    }
+    if (!this.baseUrl) throw new Error('Backend not configured');
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
-
       const response = await fetch(`${this.baseUrl}/api/capture-leads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -212,17 +260,11 @@ export class LeadCaptureService {
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload.error || 'Capture backend failed');
-      }
-
+      if (!response.ok) throw new Error(payload.error || 'Capture backend failed');
       return Array.isArray(payload.leads) ? payload.leads : [];
     } catch (error) {
-      if (error.name === 'AbortError') {
-        throw new Error('Backend timeout');
-      }
+      if (error.name === 'AbortError') throw new Error('Backend timeout');
       throw error;
     }
   }
@@ -231,13 +273,13 @@ export class LeadCaptureService {
     try {
       return await this.requestBackendCapture(config);
     } catch (error) {
-      console.warn('Backend capture unavailable, using real capture:', error.message);
+      console.warn('[LeadCapture] Backend unavailable, using real capture:', error.message);
       return await this.realCapture(config);
     }
   }
 
   async runJob(jobId, config) {
-    const { contactRequirements, captureMetric, quantity } = config;
+    const { captureMetric, quantity } = config;
     let stopProgressPulse = () => {};
 
     try {
@@ -251,6 +293,7 @@ export class LeadCaptureService {
 
       const allFound = await this.captureWithFallback(config);
       stopProgressPulse();
+
       this.dataProvider.updateCaptureJob(jobId, {
         progress: 92,
         total_found: allFound.length,
@@ -263,23 +306,14 @@ export class LeadCaptureService {
         const progress = 60 + Math.floor((i / Math.max(allFound.length, 1)) * 30);
         this.dataProvider.updateCaptureJob(jobId, { progress });
 
-        const analysis = analyzeLeadForMetric(detailedLead, captureMetric);
         detailedLead.captureMetric = captureMetric;
-        detailedLead.identifiedIssues = analysis.issues;
+        detailedLead.identifiedIssues = analyzeLeadForMetric(detailedLead, captureMetric).issues;
         detailedLead.score = this.calculateScore(detailedLead, captureMetric);
         detailedLead.estimatedValue = calculateAiDevelopmentEstimatedValue(detailedLead, captureMetric);
         detailedLead.conversionSignals = getLeadConversionSignals(detailedLead, captureMetric);
         detailedLead.prospectingPlan = buildProspectingPlan(detailedLead, captureMetric);
 
-        const valid = Boolean(
-          detailedLead.website &&
-          detailedLead.isActive !== false &&
-          detailedLead.status === 'qualified' &&
-          (!contactRequirements.website || detailedLead.website)
-        );
-
-        if (valid) {
-          detailedLead.isValid = true;
+        if (detailedLead.isValid && (detailedLead.email || detailedLead.phone)) {
           finalizedLeads.push(detailedLead);
         }
       }
@@ -294,11 +328,11 @@ export class LeadCaptureService {
         status: 'completed',
         progress: 100,
         total_valid: totalValid,
-        phaseLabel: `${totalValid} leads qualificados para prospeccao`,
+        phaseLabel: `${totalValid} leads qualificados para prospecção`,
       });
     } catch (error) {
       stopProgressPulse();
-      console.error('Lead Capture Job Failed:', error);
+      console.error('[LeadCapture] Job failed:', error);
       this.dataProvider.updateCaptureJob(jobId, {
         status: 'failed',
         progress: 100,

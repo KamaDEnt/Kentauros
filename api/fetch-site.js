@@ -1,3 +1,30 @@
+// Serverless function for fetching site content and extracting contacts
+const BLOCKED_DOMAINS = [
+  'google.com', 'facebook.com', 'instagram.com', 'linkedin.com', 'youtube.com',
+  'twitter.com', 'wikipedia.org', 'github.com', 'stackoverflow.com',
+];
+
+const PROXIES = [
+  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+];
+
+const fetchViaProxy = async (url) => {
+  for (const proxyFn of PROXIES) {
+    try {
+      const res = await fetch(proxyFn(url), {
+        signal: AbortSignal.timeout(12000),
+        headers: { 'accept': 'text/html,application/xhtml+xml' },
+      });
+      if (res.ok) {
+        const text = await res.text();
+        if (text.length > 200) return text;
+      }
+    } catch {}
+  }
+  return null;
+};
+
 export default async function handler(req, res) {
   const { url } = req.query;
 
@@ -6,47 +33,44 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Try allorigins proxy first
-    let html = null;
-    try {
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-      const response = await fetch(proxyUrl, {
-        headers: {
-          'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'accept-language': 'pt-BR,pt;q=0.9,en;q=0.7',
-        },
-      });
-      if (response.ok) {
-        html = await response.text();
-      }
-    } catch {}
-
-    // Fallback to corsproxy.io
-    if (!html) {
-      try {
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-        const response = await fetch(proxyUrl);
-        if (response.ok) {
-          html = await response.text();
-        }
-      } catch {}
+    const hostname = new URL(url).hostname.replace('www.', '');
+    if (BLOCKED_DOMAINS.some(d => hostname.includes(d))) {
+      return res.status(200).json({ emails: [], phones: [], error: 'blocked' });
     }
 
+    const html = await fetchViaProxy(url);
     if (!html) {
-      return res.status(200).json({ emails: [], phones: [] });
+      return res.status(200).json({ emails: [], phones: [], error: 'fetch_failed' });
     }
 
-    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+    // Extract emails
+    const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
     const emails = html.match(emailRegex) || [];
-    const uniqueEmails = [...new Set(emails.filter(e => !/\.(png|jpe?g|webp|gif|svg)$/i.test(e)))];
+    const uniqueEmails = [...new Set(
+      emails.filter(e => !/\.(png|jpg|jpeg|webp|gif|svg|ico)$/i.test(e))
+    )].slice(0, 5);
 
-    const phoneRegex = /(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?(?:9\d{4}[-\s]?\d{4}|\d{4}[-\s]?\d{4})/g;
-    const phones = html.match(phoneRegex) || [];
-    const uniquePhones = [...new Set(phones.map(p => p.replace(/\D/g, '')).filter(p => p.length >= 10 && p.length <= 11))];
+    // Extract Brazilian phone numbers
+    const phoneRegex = /(?:\+?55)?[\s.-]?(?:\(?\d{2}\)?)[\s.-]?9\d{4}[\s.-]?\d{4}/g;
+    const phonesRaw = html.match(phoneRegex) || [];
+    const phones = [...new Set(phonesRaw.map(p => p.replace(/\D/g, '')).filter(p => p.length >= 10 && p.length <= 13))].slice(0, 5);
 
-    res.status(200).json({ emails: uniqueEmails, phones: uniquePhones });
+    // Extract meta info
+    const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    const descriptionMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["'/]/i);
+    const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["'/]/i);
+
+    res.status(200).json({
+      emails,
+      phones,
+      meta: {
+        title: titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : '',
+        description: descriptionMatch ? descriptionMatch[1] : '',
+        ogTitle: ogTitleMatch ? ogTitleMatch[1] : '',
+      },
+    });
   } catch (error) {
-    console.error('Fetch site error:', error);
-    res.status(200).json({ emails: [], phones: [] });
+    console.error('[fetch-site] Error:', error.message);
+    res.status(200).json({ emails: [], phones: [], error: error.message });
   }
 }
