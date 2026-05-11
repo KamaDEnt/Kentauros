@@ -20,30 +20,59 @@ export class LeadCaptureService {
   generateMockLeads(config) {
     const { captureMetric, quantity = 10 } = config;
     const mockLeads = [];
+
+    const validWebsites = [
+      'https://www.totvs.com', 'https://www.cielo.com.br', 'https://www.stone.com.br',
+      'https://www.pagseguro.uol.com.br', 'https://www.linx.com.br', 'https://www.tembici.com',
+      'https://www.iFood.com.br', 'https://www.magazineluiza.com.br', 'https://www.b2w.stone.com.br',
+      'https://www.nuvemshop.com.br', 'https://www.vtex.com', 'https://www Tray.com.br',
+      'https://www.bling.com.br', 'https://www.olx.com.br', 'https://www.mercadolivre.com.br',
+      'https://www.shoptime.com.br', 'https://www.submarino.com.br', 'https://www.americanas.com.br',
+      'https://www.casaecologica.com.br', 'https://www.kanbanoffice.com.br', 'https://www.flexxo.com.br',
+      'https://www.rdstation.com', 'https://www.hotmart.com', 'https://www.ead.plataforma.school',
+      'https://www.evoluaeducacao.com.br', 'https://www.m4u.com.br', 'https://www.bancointer.com.br',
+      'https://www.nubank.com.br', 'https://www.granatum.com.br', 'https://www.contasimple.com.br',
+      'https://www.omie.com.br', 'https://www.sankhya.com.br', 'https://www.looker.com',
+      'https://www.montarcrm.com.br', 'https://www.jusbrasil.com.br', 'https://www.belvo.io',
+      'https://www.wildbeast.io', 'https://www.zapier.com', 'https://www.seguros.com.br',
+      'https://www.portoseguro.com.br', 'https://https://www.portoseguro.com.br',
+    ];
+
     const companies = [
       'Tech Solutions Brasil', 'Inova Digital', 'CloudTech LTDA', 'DataSmart Analytics',
       'WebDev Pro', 'Sistemas Inteligentes', 'CyberTech Solutions', 'DevFactory',
       'StartupHub', 'TechInovação', 'CodeLab', 'DigitalFactory', 'Software House BR',
-      'MobileFirst', 'EnterpriseTech', 'InfoTech Solutions', 'DevOps Brasil',
+      'MobileFirst', 'EnterpriseTech', 'InfoTech Solutions', 'DevOps Brasil', 'Integração Digital BR',
+      'TechFlow Solutions', 'DevHouse Brasil', 'CloudFirst Sistemas', 'SmartTech Desenvolvimento',
     ];
+
     const cities = ['São Paulo, SP', 'Rio de Janeiro, RJ', 'Curitiba, PR', 'Belo Horizonte, MG', 'Florianópolis, SC'];
     const segments = ['E-commerce', 'SaaS', 'Marketplace', 'Fintech', 'EdTech', 'HealthTech', 'Logística', 'Retail'];
-    const websites = ['site', 'loja', 'app', 'plataforma', 'sistema'];
+    const contacts = ['Carlos Silva', 'Ana Oliveira', 'Pedro Santos', 'Maria Costa', 'João Ferreira', 'Julia Almeida'];
 
-    const targetCount = Math.min(Number(quantity) || 10, 20);
+    const targetCount = Math.min(Number(quantity) || 10, validWebsites.length);
+    const usedWebsites = new Set();
+
     for (let i = 0; i < targetCount; i++) {
+      let website = validWebsites[i % validWebsites.length];
+      while (usedWebsites.has(website) && usedWebsites.size < validWebsites.length) {
+        website = validWebsites[Math.floor(Math.random() * validWebsites.length)];
+      }
+      usedWebsites.add(website);
+
       const company = companies[i % companies.length];
       const segment = segments[i % segments.length];
       const city = cities[i % cities.length];
-      const siteType = websites[i % websites.length];
+      const contact = contacts[i % contacts.length];
+      const emailDomain = website.replace('https://www.', '').replace('http://', '');
 
       mockLeads.push({
         id: `mock_lead_${Date.now()}_${i}`,
-        company: `${company} ${i > 0 ? i : ''}`.trim(),
-        contact: 'Responsável Comercial',
-        email: `contato@${company.toLowerCase().replace(/\s+/g, '')}.com.br`,
+        company: `${company} ${i > 0 ? (i + 1) : ''}`.trim(),
+        contact: contact,
+        email: `comercial@${emailDomain}`,
         phone: `11 9${Math.floor(Math.random() * 9000 + 1000)}-${Math.floor(Math.random() * 9000 + 1000)}`,
-        website: `https://www.${siteType}${company.toLowerCase().replace(/\s+/g, '')}.com.br`,
+        website: website,
         source: 'auto_capture',
         status: 'qualified',
         industry: segment,
