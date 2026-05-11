@@ -152,12 +152,40 @@ const Proposals = () => {
       ],
     });
 
+    const relatedDiscovery = discoveries.find(d =>
+      String(d.id) === String(proposal.discoveryId) ||
+      d.clientName === proposal.clientName ||
+      d.leadId === proposal.leadId
+    );
+
     const baseTasks = [
       ['Spec SDD e critérios de aceite', 'Converter decisões do Discovery em especificação validável.', 'high'],
       ['Checklist UX/UI do cliente', 'Mapear solicitações visuais, telas e componentes esperados.', 'medium'],
       ['Implementação assistida por IA', 'Executar desenvolvimento seguindo prompt e aprovação do DEV.', 'high'],
       ['QA, evidências e documentação', 'Validar testes e documentação antes do deploy.', 'high'],
     ];
+
+    const discoveryRequirements = relatedDiscovery?.requirements || relatedDiscovery?.scope || relatedDiscovery?.functionalRequirements || [];
+    const discoveryDecisions = relatedDiscovery?.decisions || [];
+
+    if (discoveryRequirements.length > 0) {
+      discoveryRequirements.slice(0, 8).forEach((req, index) => {
+        const reqTitle = req.title || req.name || req.requirement || String(req);
+        const reqDescription = req.description || req.details || '';
+        addBacklog({
+          projectId: project.id,
+          title: reqTitle,
+          description: `Requisito funcional: ${reqDescription}`,
+          priority: req.priority || 'medium',
+          type: 'feature',
+          status: 'todo',
+          assignee: 8,
+          assigneeEmail: 'marcos@kentauros.com',
+          order: baseTasks.length + index + 1,
+          tags: ['Requisito', 'Discovery'],
+        });
+      });
+    }
 
     baseTasks.forEach(([title, description, priority], index) => {
       addBacklog({

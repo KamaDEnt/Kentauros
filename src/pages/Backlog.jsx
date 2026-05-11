@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useApp } from '../context/AppContext';
 import PageHeader from '../components/ui/PageHeader';
-import KanbanBoard from '../components/ui/KanbanBoard';
+import KanbanBoard from '../components/kanban/KanbanBoard';
 import Modal from '../components/ui/Modal';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -25,6 +25,21 @@ const Backlog = () => {
   const [sprintPlanningOpen, setSprintPlanningOpen] = useState(false);
 
   const devBacklog = useMemo(() => getDeveloperBacklog(backlog, projects, user), [backlog, projects, user]);
+
+  const backlogCards = useMemo(() => {
+    return devBacklog.map(task => ({
+      ...task,
+      column_id: task.status,
+      title: task.title,
+      description: task.description,
+    }));
+  }, [devBacklog]);
+
+  const handleMoveCard = (cardId, newColumnId) => {
+    updateBacklog(cardId, { status: newColumnId });
+    addNotification('Card movido', `Status atualizado para ${newColumnId}`, 'success');
+  };
+
   const discoveryKnowledge = useMemo(() => deriveDiscoveryKnowledge(discoveries), [discoveries]);
 
   const getProject = (task) => projects.find(project => project.id === task.projectId);
@@ -74,7 +89,7 @@ const Backlog = () => {
         actions={<Button variant="secondary" onClick={() => setSprintPlanningOpen(true)}>Sprint planning</Button>}
       />
 
-      <KanbanBoard columns={columns} data={devBacklog} onCardClick={setSelectedTask} />
+      <KanbanBoard columns={columns} cards={backlogCards} onMoveCard={handleMoveCard} onCardClick={setSelectedTask} />
 
       <Modal isOpen={!!selectedTask} onClose={() => setSelectedTask(null)} title={selectedTask?.title} actions={<Button variant="secondary" onClick={() => setSelectedTask(null)}>Fechar</Button>}>
         {selectedTask && (
