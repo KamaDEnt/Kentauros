@@ -59,20 +59,22 @@ export class LeadCaptureService {
     const seen = new Set();
 
     const doSearch = async (query) => {
+      // Always use the serverless API (same-origin)
+      const apiPath = `/api/search?q=${encodeURIComponent(query)}`;
+      console.log('[LeadCapture] Searching via proxy:', apiPath);
+
       try {
-        const url = this.baseUrl
-          ? `${this.baseUrl}/api/search?q=${encodeURIComponent(query)}`
-          : `/api/search?q=${encodeURIComponent(query)}`;
-        const response = await fetch(url, {
+        const response = await fetch(apiPath, {
           method: 'GET',
-          signal: AbortSignal.timeout(20000),
+          signal: AbortSignal.timeout(30000),
         });
         if (response?.ok) {
           const data = await response.json();
+          console.log('[LeadCapture] Search response received, html length:', data.html?.length || 0);
           return data.html || '';
         }
       } catch (err) {
-        console.warn('Search API failed:', err.message);
+        console.error('[LeadCapture] Search API failed:', err.message);
       }
       return null;
     };
