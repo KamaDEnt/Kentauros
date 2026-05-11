@@ -93,8 +93,11 @@ const Leads = () => {
       return;
     }
 
+    const leadValue = Number(newLead.value) || 0;
+
     addLead({
       ...newLead,
+      value: leadValue,
       status: 'new',
       score: Math.floor(Math.random() * 40) + 30, // Random initial score
       stage: 'warm',
@@ -423,7 +426,7 @@ const Leads = () => {
               label={t('leads.estimatedValueBrl')}
               type="number"
               value={newLead.value}
-              onChange={e => setNewLead({...newLead, value: parseFloat(e.target.value)})}
+              onChange={e => setNewLead({...newLead, value: isNaN(parseFloat(e.target.value)) ? 0 : parseFloat(e.target.value)})}
               icon={DollarSign}
             />
           </div>

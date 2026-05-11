@@ -37,16 +37,24 @@ const Proposals = () => {
 
   const displayProposals = useMemo(() => {
     const virtual = leads
-      .filter(lead => (lead.status === 'won' || (lead.tags || []).some(t => String(t).toLowerCase() === 'ganho')) && !proposals.some(p => p.clientName === lead.company))
-      .map(lead => ({
-        id: `virtual-${lead.id}`,
-        clientName: lead.company,
-        title: `Proposta Gerada (Lead Ganho) - ${lead.company}`,
-        status: 'won',
-        value: lead.value || 0,
-        documents: ['Discovery', 'Pré-acordo'],
-        isVirtual: true,
-      }));
+      .filter(lead => {
+        const hasWonStatus = lead.status === 'won';
+        const hasGanhoTag = (lead.tags || []).some(t => String(t).toLowerCase().trim() === 'ganho');
+        const alreadyHasProposal = proposals.some(p => p.clientName === lead.company);
+        return (hasWonStatus || hasGanhoTag) && !alreadyHasProposal;
+      })
+      .map(lead => {
+        const leadValue = Number(lead.value) || 0;
+        return {
+          id: `virtual-${lead.id}`,
+          clientName: lead.company,
+          title: `Proposta Gerada (Lead Ganho) - ${lead.company}`,
+          status: 'won',
+          value: leadValue,
+          documents: ['Discovery', 'Pré-acordo'],
+          isVirtual: true,
+        };
+      });
     return [...proposals, ...virtual];
   }, [proposals, leads]);
 
