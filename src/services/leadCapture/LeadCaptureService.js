@@ -171,25 +171,25 @@ export class LeadCaptureService {
       }
     }
 
-    // If no real results, generate realistic demo leads
+    // If no real results, generate demo leads
     if (results.length === 0) {
-      console.warn('[LeadCapture] No results from search, generating demo leads');
-      const cityPart = location.split(',')[0]?.trim() || 'São Paulo';
-      const statePart = location.split(',')[1]?.trim() || 'SP';
+      const cityPart = location.split(',')[0]?.trim().replace(/[^a-zA-Z0-9 ]/g, '') || 'SP';
+      const statePart = location.split(',')[1]?.trim().replace(/[^a-zA-Z0-9]/g, '') || 'BR';
+      const nicheWord = (niche.split(' ').pop() || 'empresa').toLowerCase().replace(/[^a-z]/g, '');
 
       const demoCompanies = [
-        { name: `Instituto ${cityPart} ${niche.split(' ').pop()}`, domain: `instituto${cityPart.toLowerCase().replace(/\s/g, '')}` },
-        { name: `Centro de ${niche} ${cityPart}`, domain: `centro${niche.split(' ').pop().toLowerCase()}${cityPart.toLowerCase().replace(/\s/g, '')}` },
-        { name: `Grupo ${statePart} ${niche.split(' ')[0]}`, domain: `grupo${statePart.toLowerCase()}${niche.split(' ')[0].toLowerCase()}` },
-        { name: `Consultoria ${cityPart} ${niche.split(' ').pop()}`, domain: `consultoria${cityPart.toLowerCase().replace(/\s/g, '')}` },
-        { name: `Solutions ${cityPart} Tech`, domain: `solutions${cityPart.toLowerCase().replace(/\s/g, '')}tech` },
-        { name: `Digital ${statePart} ${niche.split(' ')[0]}`, domain: `digital${statePart.toLowerCase()}${niche.split(' ')[0].toLowerCase()}` },
-        { name: `${niche.split(' ').pop()} ${cityPart} Sistemas`, domain: `${niche.split(' ').pop().toLowerCase()}${cityPart.toLowerCase().replace(/\s/g, '')}` },
-        { name: `Inovação ${cityPart} Digital`, domain: `inovacao${cityPart.toLowerCase().replace(/\s/g, '')}digital` },
-        { name: `Proficional ${statePart} ${niche.split(' ').pop()}`, domain: `proficional${statePart.toLowerCase()}` },
-        { name: `Serviços ${cityPart} BR`, domain: `servicos${cityPart.toLowerCase().replace(/\s/g, '')}br` },
-        { name: `${niche} ${statePart} Experts`, domain: `${niche.split(' ')[0].toLowerCase()}${statePart.toLowerCase()}experts` },
-        { name: `${cityPart} ${niche.split(' ').pop()} Group`, domain: `${cityPart.toLowerCase().replace(/\s/g, '')}${niche.split(' ').pop().toLowerCase()}group` },
+        { name: `Instituto de ${nicheWord} ${cityPart}`, domain: `instituto${nicheWord}${cityPart}` },
+        { name: `Centro de ${nicheWord} ${cityPart}`, domain: `centro${nicheWord}${cityPart}` },
+        { name: `Grupo ${statePart} ${nicheWord}`, domain: `grupo${statePart}${nicheWord}` },
+        { name: `Consultoria ${nicheWord} ${cityPart}`, domain: `consultoria${nicheWord}${cityPart}` },
+        { name: `Solutions ${cityPart} ${nicheWord}`, domain: `solutions${cityPart}${nicheWord}` },
+        { name: `Digital ${statePart} ${nicheWord}`, domain: `digital${statePart}${nicheWord}` },
+        { name: `${nicheWord} ${cityPart} Sistemas`, domain: `${nicheWord}${cityPart}sistemas` },
+        { name: `Inovacao ${cityPart} ${nicheWord}`, domain: `inovacao${cityPart}${nicheWord}` },
+        { name: `Proficional ${statePart} ${nicheWord}`, domain: `proficional${statePart}${nicheWord}` },
+        { name: `Services ${cityPart} ${nicheWord}`, domain: `services${cityPart}${nicheWord}` },
+        { name: `${nicheWord} ${statePart} Group`, domain: `${nicheWord}${statePart}group` },
+        { name: `${cityPart} ${nicheWord} Solutions`, domain: `${cityPart}${nicheWord}solutions` },
       ];
 
       for (let i = 0; i < quantity && i < demoCompanies.length; i++) {
@@ -199,27 +199,28 @@ export class LeadCaptureService {
           id: `lead_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
           name: c.name,
           company: c.name,
-          website: `https://${c.domain}.com.br`,
+          website: null, // No fake website - real capture needed
           email: `contato@${c.domain}.com.br`,
           phone: `119${Math.floor(9000 + Math.random() * 999)}`,
           whatsapp: `119${Math.floor(9000 + Math.random() * 999)}`,
-          emails: [`contato@${c.domain}.com.br`, `info@${c.domain}.com.br`],
-          phones: [`119${Math.floor(9000 + Math.random() * 999)}`, `119${Math.floor(8000 + Math.random() * 999)}`],
-          meta: { title: c.name, description: `Especialistas em ${niche} em ${location}` },
-          source: 'Demo (Search Unavailable)',
-          snippet: `Especialistas em ${niche} em ${location}`,
+          emails: [`contato@${c.domain}.com.br`],
+          phones: [`119${Math.floor(9000 + Math.random() * 999)}`],
+          meta: { title: c.name, description: `Empresa de ${niche} em ${location}` },
+          source: 'Demo (Busca Indisponivel)',
+          snippet: `Empresa de ${niche} em ${location}`,
           status: 'qualified',
           isValid: true,
           isActive: true,
+          isDemo: true,
           location: location,
           industry: niche,
           score: score,
           estimatedValue: Math.floor(15000 + score * 600),
           captureMetric: captureMetric,
           metricCategory: captureMetric,
-          identifiedIssues: analyzeLeadForMetric({ website: `https://${c.domain}.com.br`, industry: niche }, captureMetric).issues,
-          conversionSignals: getLeadConversionSignals({ website: `https://${c.domain}.com.br`, industry: niche, score }, captureMetric),
-          prospectingPlan: buildProspectingPlan({ website: `https://${c.domain}.com.br`, industry: niche, score }, captureMetric),
+          identifiedIssues: analyzeLeadForMetric({ website: null, industry: niche }, captureMetric).issues,
+          conversionSignals: getLeadConversionSignals({ website: null, industry: niche, score }, captureMetric),
+          prospectingPlan: buildProspectingPlan({ website: null, industry: niche, score }, captureMetric),
         });
       }
     }
