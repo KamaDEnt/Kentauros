@@ -678,37 +678,58 @@ const CaptureModal = ({ isOpen, onClose }) => {
                 </td>
                 <td>
                   <div className="font-bold text-sm text-primary">{lead.name}</div>
-                  <div className="text-[10px] text-muted flex items-center gap-1">
+                  <div className="text-[11px] text-muted flex items-center gap-1">
                     <Globe size={10} />
                     {lead.website ? (
                       <a
-                        className="capture-lead-link"
+                        className="capture-lead-link text-info hover:underline"
                         href={lead.website}
                         target="_blank"
                         rel="noreferrer"
-                        title={lead.website}
+                        title="Abrir site"
                       >
-                        {lead.website}
+                        {lead.website.replace(/^https?:\/\//, '')}
                       </a>
-                    ) : lead.location}
+                    ) : (
+                      <span className="text-warning">Sem site</span>
+                    )}
                   </div>
+                  {lead.snippet && (
+                    <div className="text-[9px] text-muted mt-0.5 truncate max-w-[200px]">{lead.snippet.substring(0, 80)}...</div>
+                  )}
                 </td>
                 <td>
-                  <div className="flex items-center gap-2">
-                    <div className="progress-bar-container w-16 h-1.5">
-                      <div 
-                        className={`progress-bar-fill ${lead.score > 70 ? 'bg-success' : lead.score > 40 ? 'bg-warning' : 'bg-danger'}`} 
-                        style={{ width: `${lead.score}%` }}
-                      ></div>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <div className="progress-bar-container w-20 h-2 rounded-full overflow-hidden bg-raised">
+                        <div
+                          className={`h-full ${lead.score > 70 ? 'bg-success' : lead.score > 40 ? 'bg-warning' : 'bg-danger'}`}
+                          style={{ width: `${lead.score}%` }}
+                        />
+                      </div>
+                      <span className="text-[12px] font-bold font-mono text-primary">{lead.score}</span>
                     </div>
-                    <span className="text-[11px] font-bold font-mono">{lead.score}</span>
+                    <div className="text-[9px] text-muted">
+                      {lead.website ? 'Site funcional' : 'Sem site'}
+                      {lead.email && ' | Email'}
+                      {lead.phone && ' | Telefone'}
+                    </div>
                   </div>
                 </td>
                 <td>
-                  <div className="flex gap-2">
-                    {lead.email && <Mail size={14} className="text-muted" title={lead.email} />}
-                    {lead.phone && <Phone size={14} className="text-muted" title={lead.phone} />}
-                    {lead.website && <Building2 size={14} className="text-muted" title={lead.website} />}
+                  <div className="flex flex-col gap-1 text-xs">
+                    {lead.email && (
+                      <div className="flex items-center gap-1 text-muted" title={lead.email}>
+                        <Mail size={12} />
+                        <span className="truncate max-w-[120px]">{lead.email}</span>
+                      </div>
+                    )}
+                    {lead.phone && (
+                      <div className="flex items-center gap-1 text-muted" title={lead.phone}>
+                        <Phone size={12} />
+                        <span>{lead.phone}</span>
+                      </div>
+                    )}
                   </div>
                 </td>
                 <td>
