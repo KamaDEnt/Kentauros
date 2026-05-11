@@ -57,12 +57,18 @@ const mergeWithLocalCache = (remoteCards) => {
 const Kanban = () => {
   const { t } = useI18n();
   const { projects, clients } = useData();
-  const [columns, setColumns] = useState([]);
+  const [columns, setColumns] = useState([
+    { id: 'discovery', name: 'Discovery', order: 1 },
+    { id: 'ux', name: 'UX Design', order: 2 },
+    { id: 'dev', name: 'Desenvolvimento', order: 3 },
+    { id: 'qa', name: 'QA', order: 4 },
+    { id: 'deploy', name: 'Deploy', order: 5 },
+  ]);
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProject, setSelectedProject] = useState('all');
-  
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState(null);
@@ -71,14 +77,15 @@ const Kanban = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch columns
+      // Fetch columns from Supabase
       const { data: cols, error: colError } = await supabase
         .from('kanban_columns')
         .select('*')
         .order('order', { ascending: true });
-      
-      if (colError) throw colError;
-      setColumns(cols);
+
+      if (!colError && cols && cols.length > 0) {
+        setColumns(cols);
+      }
 
       // Fetch cards with related data
       const { data: cardData, error: cardError } = await supabase
@@ -90,20 +97,27 @@ const Kanban = () => {
         .eq('status', 'active')
         .order('created_at', { ascending: true });
 
-      if (cardError) throw cardError;
+      if (!cardError && cardData && cardData.length > 0) {
+        // Transform data for the UI
+        const transformedCards = cardData.map(card => ({
+          ...card,
+          checklist_count: card.kanban_card_checklists?.length || 0,
+          checklist_done: card.kanban_card_checklists?.filter(i => i.is_completed).length || 0
+        }));
 
-      // Transform data for the UI
-      const transformedCards = cardData.map(card => ({
-        ...card,
-        checklist_count: card.kanban_card_checklists?.length || 0,
-        checklist_done: card.kanban_card_checklists?.filter(i => i.is_completed).length || 0
-      }));
-
-      const mergedCards = mergeWithLocalCache(transformedCards);
-      setCards(mergedCards);
-      writeKanbanCache(mergedCards);
+        const mergedCards = mergeWithLocalCache(transformedCards);
+        setCards(mergedCards);
+        writeKanbanCache(mergedCards);
+      } else {
+        // Use local cache if no data from Supabase
+        const cachedCards = readKanbanCache();
+        if (cachedCards.length) {
+          setCards(cachedCards);
+        }
+      }
     } catch (err) {
       console.error('Error fetching Kanban data:', err);
+      // Try to use local cache on error
       const cachedCards = readKanbanCache();
       if (cachedCards.length) {
         setCards(cachedCards);

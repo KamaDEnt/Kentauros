@@ -28,6 +28,7 @@ import Audit from './pages/Audit';
 import SmartLogs from './pages/SmartLogs';
 import Productivity from './pages/Productivity';
 import CEO from './pages/CEO';
+import SmartAnalytics from './pages/SmartAnalytics';
 
 function App() {
   const { user, loading } = useApp();
@@ -64,6 +65,9 @@ function App() {
         {/* CEO Agent */}
         <Route path="/ceo" element={hasPermission('admin') ? <CEO /> : <Navigate to="/" />} />
         <Route path="/ceo/:projectId" element={hasPermission('admin') ? <CEO /> : <Navigate to="/" />} />
+
+        {/* Analytics */}
+        <Route path="/analytics" element={hasPermission('admin') ? <SmartAnalytics /> : <Navigate to="/" />} />
 
         {/* Enterprise Modules */}
         <Route path="/audit" element={hasPermission('audit') ? <Audit /> : <Navigate to="/" />} />
