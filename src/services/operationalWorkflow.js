@@ -55,13 +55,42 @@ export const getMeetingReadyClients = (discoveries = [], leads = [], clients = [
 const signedProjectStatuses = new Set(['ready', 'kickoff', 'signed', 'accepted']);
 const signedProposalStatuses = new Set(['approved', 'signed', 'won']);
 
-export const getSignedReadyProjects = (projects = [], proposals = [], discoveries = [], backlog = []) => {
+export const getSignedReadyProjects = (projects = [], proposals = [], discoveries = [], backlog = [], leads = []) => {
   const knowledge = deriveDiscoveryKnowledge(discoveries);
+  
+  const resolveValue = (item, related = {}) => {
+    return Number(item.budget || item.value || related.proposal?.value || related.discovery?.estimatedValue || related.lead?.value || 0);
+  };
+
+  const leadsToPromote = leads
+    .filter(lead => lead.status === 'won' || hasUserTag(lead, 'ganho') || hasUserTag(lead, 'assinado'))
+    .filter(lead => !proposals.some(p => p.clientName === lead.company) && !projects.some(p => p.client === lead.company))
+    .map(lead => ({
+      id: `lead-project-${lead.id}`,
+      name: `Projeto ${lead.company}`,
+      client: lead.company,
+      status: 'ready',
+      readinessTag: 'Aguardando formalização',
+      budget: lead.value || 0,
+      progress: 0,
+      team: [8],
+      tags: lead.tags || ['Lead', 'Pendente'],
+      phases: [
+        { name: 'Formalização', status: 'pending' },
+        { name: 'Spec SDD', status: 'pending' },
+        { name: 'Backlog', status: 'pending' },
+      ],
+      discovery: knowledge.find(item => item.clientName === lead.company),
+      orderedTasks: [],
+    }));
+
   const signedFromProposals = proposals
     .filter(proposal => signedProposalStatuses.has(proposal.status))
     .map(proposal => {
       const existing = projects.find(project => project.client === proposal.clientName || project.name.includes(proposal.clientName));
       const discovery = knowledge.find(item => item.id === proposal.discoveryId || item.clientName === proposal.clientName);
+      const lead = leads.find(l => l.company === proposal.clientName);
+      
       return {
         ...(existing || {}),
         id: existing?.id || `proposal-${proposal.id}`,
@@ -69,8 +98,8 @@ export const getSignedReadyProjects = (projects = [], proposals = [], discoverie
         client: proposal.clientName,
         clientId: existing?.clientId || null,
         status: existing?.status || 'ready',
-        readinessTag: 'Assinado, apto para início',
-        budget: proposal.value,
+        readinessTag: existing?.readinessTag || 'Assinado, apto para início',
+        budget: resolveValue(proposal, { existing, discovery, lead }),
         progress: existing?.progress || 0,
         team: existing?.team || [8],
         tags: existing?.tags || ['SDD', 'Discovery', 'Automação'],
@@ -102,7 +131,7 @@ export const getSignedReadyProjects = (projects = [], proposals = [], discoverie
       ],
     }));
 
-  const all = [...signedFromProposals, ...readyProjectRecords];
+  const all = [...leadsToPromote, ...signedFromProposals, ...readyProjectRecords];
   return all.filter((project, index) => all.findIndex(item => item.id === project.id) === index);
 };
 
@@ -336,9 +365,11 @@ export const getDeployReadiness = (deployments = [], projects = [], backlog = []
 });
 
 export const getDashboardMetrics = ({ leads = [], projects = [], backlog = [], proposals = [], qaTests = [], deployments = [], automations = [] }) => {
-  const signedRevenue = proposals
-    .filter(proposal => ['approved', 'signed', 'won'].includes(proposal.status))
-    .reduce((sum, proposal) => sum + Number(proposal.value || 0), 0);
+  const signedRevenue = [
+    ...proposals.filter(proposal => ['approved', 'signed', 'won'].includes(proposal.status)),
+    ...leads.filter(lead => lead.status === 'won' || hasUserTag(lead, 'ganho') || hasUserTag(lead, 'assinado'))
+      .filter(lead => !proposals.some(p => p.clientName === lead.company))
+  ].reduce((sum, item) => sum + Number(item.value || item.budget || 0), 0);
   const activeLeads = leads.filter(lead => lead.status !== 'lost').length;
   const qualifiedLeads = leads.filter(lead => ['qualified', 'discovery', 'proposal', 'won'].includes(lead.status)).length;
   const contactedLeads = leads.filter(lead => lead.emailStatus === 'sent' || (lead.interactionHistory || []).some(item => item.type === 'email_sent')).length;

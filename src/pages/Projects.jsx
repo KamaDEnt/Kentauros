@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
@@ -37,7 +37,7 @@ const Projects = () => {
   const { user, addNotification } = useApp();
   const navigate = useNavigate();
   const [selectedProject, setSelectedProject] = useState(null);
-  const readyProjects = useMemo(() => getSignedReadyProjects(projects, proposals, discoveries, backlog), [projects, proposals, discoveries, backlog]);
+  const readyProjects = useMemo(() => getSignedReadyProjects(projects, proposals, discoveries, backlog, leads), [projects, proposals, discoveries, backlog, leads]);
 
   const progress = (project) => {
     const phases = project.phases || [];
@@ -116,7 +116,7 @@ const Projects = () => {
       content: `Projeto aceito por ${user?.email || 'DEV'} e encaminhado ao backlog com atividades ordenadas pela IA.`,
       project_id: String(project.id),
       tags: ['Project', 'Backlog', 'DEV'],
-      metadata: { projectId: project.id, developerId: user?.id, generatedTasks: plan.creates.length },
+      metadata: { project_id: project.id, developer_id: user?.id, generated_tasks: plan.creates.length },
     });
 
     addNotification('Projeto aceito', 'As atividades foram vinculadas ao seu backlog.', 'success');

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import { useApp } from './AppContext';
 import { useAudit } from './AuditContext';
 import { mockLeads, mockClients, mockDiscoveries, mockProposals } from '../data/mock-leads';
@@ -607,7 +607,7 @@ export const DataProvider = ({ children }) => {
       leads, setLeads, updateLead: updateEntity(setLeads, 'Lead'), addLead: addEntity(setLeads, 'Lead'), deleteLead: deleteEntity(setLeads, 'Lead'),
       clients, setClients, updateClient: updateEntity(setClients, 'Client'), addClient: addEntity(setClients, 'Client'),
       discoveries, setDiscoveries, updateDiscovery: updateEntity(setDiscoveries, 'Discovery'), addDiscovery: addEntity(setDiscoveries, 'Discovery'), deleteDiscovery: deleteEntity(setDiscoveries, 'Discovery'),
-      proposals, setProposals, updateProposal: updateEntity(setProposals, 'Proposal'), addProposal: addEntity(setProposals, 'Proposal'),
+      proposals, setProposals, updateProposal: updateEntity(setProposals, 'Proposal'), addProposal: addEntity(setProposals, 'Proposal'), deleteProposal: deleteEntity(setProposals, 'Proposal'),
       projects, setProjects, updateProject: updateEntity(setProjects, 'Project'), addProject: addEntity(setProjects, 'Project'),
       backlog, setBacklog, updateBacklog: updateEntity(setBacklog, 'BacklogTask'), addBacklog: addEntity(setBacklog, 'BacklogTask'),
       qaTests, setQaTests, updateQaTest: updateEntity(setQaTests, 'QATest'), addQaTest: addEntity(setQaTests, 'QATest'),

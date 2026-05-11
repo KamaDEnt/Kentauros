@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useApp } from '../context/AppContext';
 import { useI18n } from '../context/I18nContext';
@@ -13,7 +13,7 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import Textarea from '../components/ui/Textarea';
 import EmptyState from '../components/ui/EmptyState';
-import { Search, Plus, Building2, User, Mail, Phone, DollarSign, Filter, Zap } from 'lucide-react';
+import { Search, Plus, Building2, User, Mail, Phone, DollarSign, Zap } from 'lucide-react';
 import CaptureModal from '../components/leads/CaptureModal';
 import { createLeadInteraction } from '../services/leadCapture/leadConversionStrategy';
 
@@ -142,6 +142,7 @@ const Leads = () => {
       status: selectedLead.status || 'new',
       industry: selectedLead.industry || '',
       notes: selectedLead.notes || '',
+      tags: selectedLead.tags || [],
     });
     setIsEditingLead(true);
   };
@@ -165,7 +166,10 @@ const Leads = () => {
     // Sync with Discovery if exists
     const associatedDiscovery = discoveries.find(d => d.leadId === selectedLead.id);
     if (associatedDiscovery) {
-      updateDiscovery(associatedDiscovery.id, { estimatedValue: updated.value });
+      updateDiscovery(associatedDiscovery.id, { 
+        estimatedValue: updated.value,
+        clientName: updated.company
+      });
     }
 
     setSelectedLead({ ...selectedLead, ...updated });
@@ -485,6 +489,13 @@ const Leads = () => {
                       { value: 'Captura Automática', label: 'Captura Automática' },
                     ]}
                   />
+                  <div className="input-group">
+                    <label className="input-label">Tags (separadas por vírgula)</label>
+                    <Input 
+                      value={editLead.tags.join(', ')} 
+                      onChange={event => setEditLead(prev => ({ ...prev, tags: event.target.value.split(',').map(t => t.trim()).filter(Boolean) }))} 
+                    />
+                  </div>
                 </div>
                 <Textarea
                   label="Notas internas"
@@ -571,6 +582,16 @@ const Leads = () => {
                     <div className="flex gap-xs flex-wrap">
                       {selectedLead.conversionSignals.map(signal => (
                         <Badge key={signal.key} variant="secondary">{signal.label}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {(selectedLead.tags || []).length > 0 && (
+                  <div className="mb-lg">
+                    <label className="input-label">Tags</label>
+                    <div className="flex gap-xs flex-wrap">
+                      {selectedLead.tags.map(tag => (
+                        <Badge key={tag} variant="secondary">{tag}</Badge>
                       ))}
                     </div>
                   </div>

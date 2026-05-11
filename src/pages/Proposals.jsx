@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useApp } from '../context/AppContext';
 import PageHeader from '../components/ui/PageHeader';
@@ -18,18 +18,44 @@ const getStatusType = (status) => {
 };
 
 const Proposals = () => {
-  const { proposals = [], discoveries, leads, clients, addProposal, updateProposal, addProject, addBacklog, addQaTest, addDeployment, addAutomation, addApprovalRequest, addLearningEvent } = useData();
+  const { proposals = [], discoveries, leads, clients, addProposal, updateProposal, deleteProposal, addProject, addBacklog, addQaTest, addDeployment, addAutomation, addApprovalRequest, addLearningEvent } = useData();
   const { user, addNotification } = useApp();
+
+  const handleDeleteProposal = (proposal) => {
+    if (proposal.isVirtual) {
+      addNotification('Ação não permitida', 'Propostas virtuais são baseadas em leads ganhos. Para removê-la, altere o status do Lead.', 'warning');
+      return;
+    }
+
+    if (window.confirm(`Tem certeza que deseja deletar a proposta para ${proposal.clientName}?`)) {
+      deleteProposal(proposal.id);
+      addNotification('Proposta removida', 'A proposta foi excluída com sucesso.', 'success');
+    }
+  };
   const meetingClients = useMemo(() => getMeetingReadyClients(discoveries, leads, clients), [discoveries, leads, clients]);
   const [selectedDiscoveryId, setSelectedDiscoveryId] = useState(meetingClients[0]?.id || '');
 
+  const displayProposals = useMemo(() => {
+    const virtual = leads
+      .filter(lead => (lead.status === 'won' || (lead.tags || []).some(t => String(t).toLowerCase() === 'ganho')) && !proposals.some(p => p.clientName === lead.company))
+      .map(lead => ({
+        id: `virtual-${lead.id}`,
+        clientName: lead.company,
+        title: `Proposta Gerada (Lead Ganho) - ${lead.company}`,
+        status: 'won',
+        value: lead.value || 0,
+        documents: ['Discovery', 'Pré-acordo'],
+        isVirtual: true,
+      }));
+    return [...proposals, ...virtual];
+  }, [proposals, leads]);
+
   const selectedMeeting = meetingClients.find(item => String(item.id) === String(selectedDiscoveryId));
 
-  useEffect(() => {
-    if (!selectedDiscoveryId && meetingClients[0]) {
-      setSelectedDiscoveryId(meetingClients[0].id);
-    }
-  }, [meetingClients, selectedDiscoveryId]);
+  // Auto-select first meeting if none selected and available
+  if (!selectedDiscoveryId && meetingClients.length > 0) {
+    setSelectedDiscoveryId(meetingClients[0].id);
+  }
 
   const handleGenerateProposal = () => {
     if (!selectedMeeting) {
@@ -220,9 +246,9 @@ const Proposals = () => {
       </Card>
 
       <div className="proposal-stats-grid mb-xl">
-        <StatCard label="Pipeline total" value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(proposals.reduce((acc, p) => acc + Number(p.value || 0), 0))} />
-        <StatCard label="Aguardando assinatura" value={proposals.filter(p => ['sent', 'draft'].includes(p.status)).length} />
-        <StatCard label="Assinadas" value={proposals.filter(p => ['approved', 'signed', 'won'].includes(p.status)).length} />
+        <StatCard label="Pipeline total" value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(displayProposals.reduce((acc, p) => acc + Number(p.value || 0), 0))} />
+        <StatCard label="Aguardando assinatura" value={displayProposals.filter(p => ['sent', 'draft'].includes(p.status)).length} />
+        <StatCard label="Assinadas" value={displayProposals.filter(p => ['approved', 'signed', 'won'].includes(p.status)).length} />
       </div>
 
       <Card className="table-wrapper">
@@ -238,11 +264,13 @@ const Proposals = () => {
             </tr>
           </thead>
           <tbody>
-            {proposals.map(proposal => (
+            {displayProposals.map(proposal => (
               <tr key={proposal.id}>
                 <td>
                   <div className="font-bold">{proposal.title}</div>
-                  <div className="text-xs text-muted">Discovery: {proposal.discoveryId || 'manual'}</div>
+                  <div className="text-xs text-muted">
+                    {proposal.isVirtual ? 'Baseado em Lead Ganho' : `Discovery: ${proposal.discoveryId || 'manual'}`}
+                  </div>
                 </td>
                 <td>{proposal.clientName}</td>
                 <td className="font-mono">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(proposal.value || 0)}</td>
@@ -254,6 +282,7 @@ const Proposals = () => {
                     {!['approved', 'signed', 'won'].includes(proposal.status) && (
                       <Button variant="primary" size="sm" onClick={() => handleSignProposal(proposal)}>Assinar</Button>
                     )}
+                    <Button variant="danger" size="sm" onClick={() => handleDeleteProposal(proposal)}>Deletar</Button>
                   </div>
                 </td>
               </tr>
