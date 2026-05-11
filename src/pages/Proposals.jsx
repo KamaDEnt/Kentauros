@@ -8,7 +8,7 @@ import StatCard from '../components/ui/StatCard';
 import Button from '../components/ui/Button';
 import Select from '../components/ui/Select';
 import { canAccessAdmin, getMeetingReadyClients } from '../services/operationalWorkflow';
-import { buildProposalDocument, downloadTextFile, renderProposalDocumentText } from '../services/deliveryDocuments';
+import { buildProposalDocument, downloadTextFile, renderProposalDocumentText, buildContractDocument, downloadContractDocument } from '../services/deliveryDocuments';
 
 const getStatusType = (status) => {
   if (['approved', 'signed', 'won'].includes(status)) return 'success';
@@ -21,6 +21,8 @@ const Proposals = () => {
   const { proposals = [], discoveries, leads, clients, addProposal, updateProposal, deleteProposal, addProject, addBacklog, addQaTest, addDeployment, addAutomation, addApprovalRequest, addLearningEvent } = useData();
   const { user, addNotification } = useApp();
 
+  const [selectedProposalForContract, setSelectedProposalForContract] = useState(null);
+
   const handleDeleteProposal = (proposal) => {
     if (proposal.isVirtual) {
       addNotification('Ação não permitida', 'Propostas virtuais são baseadas em leads ganhos. Para removê-la, altere o status do Lead.', 'warning');
@@ -31,6 +33,68 @@ const Proposals = () => {
       deleteProposal(proposal.id);
       addNotification('Proposta removida', 'A proposta foi excluída com sucesso.', 'success');
     }
+  };
+
+  const handleDownloadContract = (proposal) => {
+    const client = clients.find(c => c.company === proposal.clientName);
+    const discovery = discoveries.find(d => String(d.id) === String(proposal.discoveryId) || d.clientName === proposal.clientName);
+    const contract = buildContractDocument({ proposal, discovery, client });
+    downloadContractDocument(contract);
+    setSelectedProposalForContract(proposal.id);
+    updateProposal(proposal.id, { tag: 'Aguardando assinatura' });
+    addLearningEvent({
+      source: 'contract',
+      event_type: 'contract_downloaded',
+      title: `Contrato baixado - ${proposal.clientName}`,
+      content: 'Cliente baixou o contrato para análise e assinatura.',
+      tags: ['Contract', 'Proposal'],
+      metadata: { proposalId: proposal.id },
+    });
+    addNotification('Contrato gerado', 'Contrato disponível para assinatura.', 'info');
+  };
+
+  const handleUploadSignedContract = (proposalId) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.doc,.docx,.txt';
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const signedContract = {
+            filename: file.name,
+            uploadedAt: new Date().toISOString(),
+            data: event.target.result,
+          };
+          updateProposal(proposalId, {
+            signedContract,
+            tag: 'Contrato assinado',
+            contractUploadedAt: new Date().toISOString(),
+          });
+          addNotification('Contrato recebido', 'Upload do contrato assinado realizado.', 'success');
+          addLearningEvent({
+            source: 'contract',
+            event_type: 'contract_signed_uploaded',
+            title: `Contrato assinado - ${proposalId}`,
+            content: `Arquivo ${file.name} enviado pelo cliente.`,
+            tags: ['Contract', 'Signed'],
+            metadata: { proposalId, filename: file.name },
+          });
+          setSelectedProposalForContract(null);
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    input.click();
+  };
+
+  const handleConfirmSignedContract = (proposal) => {
+    if (!canAccessAdmin(user)) {
+      addNotification('Permissão negada', 'Apenas administradores podem confirmar contratos.', 'error');
+      return;
+    }
+    handleSignProposal(proposal);
   };
   const meetingClients = useMemo(() => getMeetingReadyClients(discoveries, leads, clients), [discoveries, leads, clients]);
   const [selectedDiscoveryId, setSelectedDiscoveryId] = useState(meetingClients[0]?.id || '');
@@ -283,8 +347,8 @@ const Proposals = () => {
 
       <div className="proposal-stats-grid mb-xl">
         <StatCard label="Pipeline total" value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(displayProposals.reduce((acc, p) => acc + Number(p.value || 0), 0))} />
-        <StatCard label="Aguardando assinatura" value={displayProposals.filter(p => ['sent', 'draft'].includes(p.status)).length} />
-        <StatCard label="Assinadas" value={displayProposals.filter(p => ['approved', 'signed', 'won'].includes(p.status)).length} />
+        <StatCard label="Aguardando assinatura" value={displayProposals.filter(p => ['sent', 'draft'].includes(p.status) || p.tag === 'Aguardando assinatura').length} />
+        <StatCard label="Assinadas" value={displayProposals.filter(p => ['approved', 'signed', 'won'].includes(p.status) || p.tag === 'Contrato assinado').length} />
       </div>
 
       <Card className="table-wrapper">
@@ -313,12 +377,26 @@ const Proposals = () => {
                 <td><Badge variant={getStatusType(proposal.status)}>{proposal.status}</Badge></td>
                 <td className="text-xs text-muted">{(proposal.documents || ['Escopo', 'Valores', 'Termos']).join(', ')}</td>
                 <td>
-                  <div className="flex gap-sm">
-                    <Button variant="secondary" size="sm" onClick={() => downloadProposal(proposal)}>PDF</Button>
-                    {!['approved', 'signed', 'won'].includes(proposal.status) && (
-                      <Button variant="primary" size="sm" onClick={() => handleSignProposal(proposal)}>Assinar</Button>
+                  <div className="flex gap-sm flex-col">
+                    <div className="flex gap-sm">
+                      <Button variant="secondary" size="sm" onClick={() => downloadProposal(proposal)}>PDF</Button>
+                      {proposal.tag === 'Contrato assinado' && canAccessAdmin(user) && (
+                        <Button variant="success" size="sm" onClick={() => handleConfirmSignedContract(proposal)}>Confirmar projeto</Button>
+                      )}
+                      <Button variant="danger" size="sm" onClick={() => handleDeleteProposal(proposal)}>Deletar</Button>
+                    </div>
+                    {proposal.tag !== 'Contrato assinado' && !['approved', 'signed', 'won'].includes(proposal.status) && (
+                      <div className="contract-actions mt-xs">
+                        {!proposal.tag ? (
+                          <Button variant="outline" size="sm" onClick={() => handleDownloadContract(proposal)}>Gerar Contrato</Button>
+                        ) : proposal.tag === 'Aguardando assinatura' ? (
+                          <div className="flex gap-sm items-center">
+                            <Badge variant="accent">Aguardando assinatura</Badge>
+                            <Button variant="primary" size="sm" onClick={() => handleUploadSignedContract(proposal.id)}>Upload Contrato</Button>
+                          </div>
+                        ) : null}
+                      </div>
                     )}
-                    <Button variant="danger" size="sm" onClick={() => handleDeleteProposal(proposal)}>Deletar</Button>
                   </div>
                 </td>
               </tr>
