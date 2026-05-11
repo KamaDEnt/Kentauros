@@ -7,8 +7,16 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
-import { buildProjectAcceptancePlan, getSignedReadyProjects } from '../services/operationalWorkflow';
+import { buildProjectAcceptancePlan, getSignedReadyProjects, canAccessAdmin } from '../services/operationalWorkflow';
 import { buildClientProjectContext, buildApprovalChecklist } from '../services/projectContextBuilder';
+
+const PHASE_ROUTES = {
+  'Spec SDD': '/discovery',
+  'Backlog': '/backlog',
+  'Desenvolvimento': '/kanban',
+  'QA': '/qa',
+  'Deploy': '/deployments',
+};
 
 const formatDateTime = (value) => {
   if (!value) return '-';
@@ -220,6 +228,37 @@ const Projects = () => {
                 <strong>{selectedProject.orderedTasks?.length || 'Será gerado ao aceitar'}</strong>
               </div>
             </div>
+
+            {canAccessAdmin(user) && selectedProject.phases?.length > 0 && (
+              <div className="project-detail-section">
+                <div className="project-section-title">
+                  <span>Fases do Projeto</span>
+                  <Badge variant="secondary">{selectedProject.phases.length}</Badge>
+                </div>
+                <div className="project-phases-grid mt-sm">
+                  {selectedProject.phases.map((phase, index) => {
+                    const route = PHASE_ROUTES[phase.name];
+                    const isPending = phase.status === 'pending';
+                    return (
+                      <div key={index} className={`project-phase-card ${phase.status === 'completed' ? 'completed' : ''} ${isPending ? 'pending' : ''}`}>
+                        <div className="project-phase-header">
+                          <span className="project-phase-index">{index + 1}</span>
+                          <Badge variant={phase.status === 'completed' ? 'success' : phase.status === 'in_progress' ? 'accent' : 'warning'}>
+                            {phase.status === 'completed' ? 'concluído' : phase.status === 'in_progress' ? 'em progresso' : 'pendente'}
+                          </Badge>
+                        </div>
+                        <span className="project-phase-name">{phase.name}</span>
+                        {isPending && route && (
+                          <Button variant="secondary" size="sm" className="mt-2" onClick={() => navigate(route)}>
+                            Acessar tela
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="project-detail-section">
               <div className="project-section-title">

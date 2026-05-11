@@ -845,10 +845,12 @@ code, .font-mono { font-family: var(--font-mono); }
 
 .modal-lg {
   width: min(100%, 900px);
+  max-width: 900px;
 }
 
 .modal-xl {
   width: min(100%, 1120px);
+  max-width: 1120px;
 }
 
 .modal-header {
@@ -1224,6 +1226,7 @@ code, .font-mono { font-family: var(--font-mono); }
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
+  padding: var(--sp-2);
 }
 
 .project-detail-summary {
@@ -1272,6 +1275,58 @@ code, .font-mono { font-family: var(--font-mono); }
 
 .project-history-panel {
   gap: var(--sp-4);
+}
+
+.project-phases-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--sp-3);
+}
+
+.project-phase-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.project-phase-card.pending {
+  border-color: var(--color-warning);
+  background: rgba(255, 193, 7, 0.05);
+}
+
+.project-phase-card.completed {
+  border-color: var(--color-success);
+  background: rgba(34, 197, 94, 0.05);
+}
+
+.project-phase-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.project-phase-index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+}
+
+.project-phase-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .project-decision-list {
