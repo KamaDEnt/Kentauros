@@ -5,8 +5,6 @@ import {
 } from './leadCaptureInsights.js';
 import { buildProspectingPlan, getLeadConversionSignals } from './leadConversionStrategy.js';
 
-const isProduction = window.location.hostname !== 'localhost' && !window.location.hostname.includes('.local');
-
 const BLOCKED_DOMAINS = [
   'google.', 'bing.', 'facebook.', 'instagram.', 'linkedin.', 'youtube.', 'tiktok.',
   'twitter.', 'x.com', 'reclameaqui.', 'jusbrasil.', 'doctoralia.', 'boaconsulta.',
@@ -38,41 +36,10 @@ const normalizeWebsiteUrl = (rawUrl = '') => {
   }
 };
 
-const extractEmailsFromText = (text = '') => {
-  const emails = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [];
-  return [...new Set(emails.filter(e => !/\.(png|jpe?g|webp|gif|svg)$/i.test(e)))];
-};
-
-const extractPhonesFromText = (text = '') => {
-  const phones = text.match(/(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?(?:9\d{4}[-\s]?\d{4}|\d{4}[-\s]?\d{4})/g) || [];
-  return [...new Set(phones.map(p => p.replace(/\D/g, '')).filter(p => p.length >= 10 && p.length <= 11))];
-};
-
-const fetchWithTimeout = async (url, timeoutMs = 15000) => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'accept-language': 'pt-BR,pt;q=0.9,en;q=0.7',
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36',
-      },
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    return response;
-  } catch {
-    clearTimeout(timeout);
-    return null;
-  }
-};
-
 export class LeadCaptureService {
   constructor(dataProvider, baseUrl) {
     this.dataProvider = dataProvider;
-    this.baseUrl = baseUrl || (isProduction ? '' : 'http://localhost:3001');
+    this.baseUrl = baseUrl;
   }
 
   calculateScore(lead, metric) {
@@ -91,60 +58,76 @@ export class LeadCaptureService {
 
     const seen = new Set();
 
+    const doSearch = async (query) => {
+      if (this.baseUrl) {
+        try {
+          const response = await fetch(`${this.baseUrl}/api/search?q=${encodeURIComponent(query)}`, {
+            method: 'GET',
+            signal: AbortSignal.timeout(20000),
+          });
+          if (response?.ok) {
+            const data = await response.json();
+            return data.html || '';
+          }
+        } catch {}
+      }
+      return null;
+    };
+
     for (const query of searchQueries) {
       if (results.length >= quantity) break;
 
       try {
-        const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-        const response = await fetchWithTimeout(searchUrl, 20000);
+        const html = await doSearch(query);
+        if (!html) continue;
 
-        if (response?.ok) {
-          const html = await response.text();
-          const linkRegex = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-          let match;
+        const linkRegex = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+        let match;
 
-          while ((match = linkRegex.exec(html)) !== null && results.length < quantity) {
-            const href = match[1];
-            const title = match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-            const website = normalizeWebsiteUrl(href);
+        while ((match = linkRegex.exec(html)) !== null && results.length < quantity) {
+          const href = match[1];
+          const title = match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+          const website = normalizeWebsiteUrl(href);
 
-            if (!website || seen.has(website) || title.length < 3) continue;
-            if (BLOCKED_DOMAINS.some(d => website.includes(d))) continue;
+          if (!website || seen.has(website) || title.length < 3) continue;
+          if (BLOCKED_DOMAINS.some(d => website.includes(d))) continue;
 
-            seen.add(website);
+          seen.add(website);
 
-            const websiteResponse = await fetchWithTimeout(website, 15000);
-            let emails = [];
-            let phones = [];
-
-            if (websiteResponse?.ok) {
-              const siteHtml = await websiteResponse.text().catch(() => '');
-              emails = extractEmailsFromText(siteHtml);
-              phones = extractPhonesFromText(siteHtml);
-            }
-
-            results.push({
-              id: `lead_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-              name: title,
-              company: title,
-              website: website,
-              email: emails[0] || null,
-              phone: phones[0] || null,
-              whatsapp: phones.find(p => p.length === 11) || null,
-              source: 'DuckDuckGo Search',
-              status: 'qualified',
-              isValid: true,
-              isActive: true,
-              location: location,
-              industry: niche,
-              score: Math.floor(Math.random() * 30 + 70),
-              estimatedValue: Math.floor(Math.random() * 50000 + 15000),
-              captureMetric: config.captureMetric || niche,
-              metricCategory: config.captureMetric || niche,
+          let emails = [];
+          let phones = [];
+          try {
+            const siteResponse = await fetch(`${this.baseUrl}/api/fetch-site?url=${encodeURIComponent(website)}`, {
+              signal: AbortSignal.timeout(15000),
             });
+            if (siteResponse?.ok) {
+              const siteData = await siteResponse.json();
+              emails = siteData.emails || [];
+              phones = siteData.phones || [];
+            }
+          } catch {}
 
-            if (results.length >= quantity) break;
-          }
+          results.push({
+            id: `lead_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+            name: title,
+            company: title,
+            website: website,
+            email: emails[0] || null,
+            phone: phones[0] || null,
+            whatsapp: phones.find(p => p.length === 11) || null,
+            source: 'DuckDuckGo Search',
+            status: 'qualified',
+            isValid: true,
+            isActive: true,
+            location: location,
+            industry: niche,
+            score: Math.floor(Math.random() * 30 + 70),
+            estimatedValue: Math.floor(Math.random() * 50000 + 15000),
+            captureMetric: config.captureMetric || niche,
+            metricCategory: config.captureMetric || niche,
+          });
+
+          if (results.length >= quantity) break;
         }
       } catch (error) {
         console.warn('Search query failed:', error.message);
