@@ -7,6 +7,68 @@ import { buildProspectingPlan, getLeadConversionSignals } from './leadConversion
 
 const isProduction = window.location.hostname !== 'localhost' && !window.location.hostname.includes('.local');
 
+const BLOCKED_DOMAINS = [
+  'google.', 'bing.', 'facebook.', 'instagram.', 'linkedin.', 'youtube.', 'tiktok.',
+  'twitter.', 'x.com', 'reclameaqui.', 'jusbrasil.', 'doctoralia.', 'boaconsulta.',
+  'guiamais.', 'telelistas.', 'apontador.', 'tripadvisor.', 'wikipedia.',
+  'mercadolivre.', 'olx.', 'zapimoveis.', 'vivareal.', 'webmotors.',
+  'noticias', 'blogspot.', 'medium.com', 'wordpress.com', 'gov.br',
+  'baidu.', 'yahoo.', 'pinterest.', 'reddit.', 'quora.', 'archive.',
+  'boaempresa.', 'gympass.', 'wellhub.', 'helpcenter.', 'encontra', 'guiado',
+];
+
+const normalizeWebsiteUrl = (rawUrl = '') => {
+  if (!rawUrl) return null;
+  try {
+    let value = String(rawUrl).trim();
+    if (value.startsWith('//')) value = `https:${value}`;
+    if (value.includes('/url?')) {
+      const parsed = new URL(value);
+      value = parsed.searchParams.get('q') || parsed.searchParams.get('url') || value;
+    }
+    const url = new URL(value.startsWith('http') ? value : `https://${value}`);
+    url.hash = '';
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid'].forEach(key => url.searchParams.delete(key));
+    if (!['http:', 'https:'].includes(url.protocol)) return null;
+    const hostname = url.hostname.toLowerCase().replace(/^www\./, '');
+    if (hostname.length < 4 || !hostname.includes('.') || BLOCKED_DOMAINS.some(domain => hostname.includes(domain))) return null;
+    return `${url.protocol}//${hostname}${url.pathname === '/' ? '' : url.pathname}`.replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+};
+
+const extractEmailsFromText = (text = '') => {
+  const emails = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [];
+  return [...new Set(emails.filter(e => !/\.(png|jpe?g|webp|gif|svg)$/i.test(e)))];
+};
+
+const extractPhonesFromText = (text = '') => {
+  const phones = text.match(/(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?(?:9\d{4}[-\s]?\d{4}|\d{4}[-\s]?\d{4})/g) || [];
+  return [...new Set(phones.map(p => p.replace(/\D/g, '')).filter(p => p.length >= 10 && p.length <= 11))];
+};
+
+const fetchWithTimeout = async (url, timeoutMs = 15000) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'accept-language': 'pt-BR,pt;q=0.9,en;q=0.7',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36',
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    return response;
+  } catch {
+    clearTimeout(timeout);
+    return null;
+  }
+};
+
 export class LeadCaptureService {
   constructor(dataProvider, baseUrl) {
     this.dataProvider = dataProvider;
@@ -17,74 +79,79 @@ export class LeadCaptureService {
     return calculateCaptureScore(lead, metric);
   }
 
-  generateMockLeads(config) {
-    const { captureMetric, quantity = 10 } = config;
-    const mockLeads = [];
+  async realCapture(config) {
+    const { niche, location, quantity = 20 } = config;
+    const results = [];
 
-    const validWebsites = [
-      'https://www.totvs.com', 'https://www.cielo.com.br', 'https://www.stone.com.br',
-      'https://www.pagseguro.uol.com.br', 'https://www.linx.com.br', 'https://www.tembici.com',
-      'https://www.iFood.com.br', 'https://www.magazineluiza.com.br', 'https://www.b2w.stone.com.br',
-      'https://www.nuvemshop.com.br', 'https://www.vtex.com', 'https://www Tray.com.br',
-      'https://www.bling.com.br', 'https://www.olx.com.br', 'https://www.mercadolivre.com.br',
-      'https://www.shoptime.com.br', 'https://www.submarino.com.br', 'https://www.americanas.com.br',
-      'https://www.casaecologica.com.br', 'https://www.kanbanoffice.com.br', 'https://www.flexxo.com.br',
-      'https://www.rdstation.com', 'https://www.hotmart.com', 'https://www.ead.plataforma.school',
-      'https://www.evoluaeducacao.com.br', 'https://www.m4u.com.br', 'https://www.bancointer.com.br',
-      'https://www.nubank.com.br', 'https://www.granatum.com.br', 'https://www.contasimple.com.br',
-      'https://www.omie.com.br', 'https://www.sankhya.com.br', 'https://www.looker.com',
-      'https://www.montarcrm.com.br', 'https://www.jusbrasil.com.br', 'https://www.belvo.io',
-      'https://www.wildbeast.io', 'https://www.zapier.com', 'https://www.seguros.com.br',
-      'https://www.portoseguro.com.br', 'https://https://www.portoseguro.com.br',
+    const searchQueries = [
+      `${niche} ${location} site:com.br`,
+      `${niche} ${location} empresa contato`,
+      `${niche} ${location} orçamento site oficial`,
     ];
 
-    const companies = [
-      'Tech Solutions Brasil', 'Inova Digital', 'CloudTech LTDA', 'DataSmart Analytics',
-      'WebDev Pro', 'Sistemas Inteligentes', 'CyberTech Solutions', 'DevFactory',
-      'StartupHub', 'TechInovação', 'CodeLab', 'DigitalFactory', 'Software House BR',
-      'MobileFirst', 'EnterpriseTech', 'InfoTech Solutions', 'DevOps Brasil', 'Integração Digital BR',
-      'TechFlow Solutions', 'DevHouse Brasil', 'CloudFirst Sistemas', 'SmartTech Desenvolvimento',
-    ];
+    const seen = new Set();
 
-    const cities = ['São Paulo, SP', 'Rio de Janeiro, RJ', 'Curitiba, PR', 'Belo Horizonte, MG', 'Florianópolis, SC'];
-    const segments = ['E-commerce', 'SaaS', 'Marketplace', 'Fintech', 'EdTech', 'HealthTech', 'Logística', 'Retail'];
-    const contacts = ['Carlos Silva', 'Ana Oliveira', 'Pedro Santos', 'Maria Costa', 'João Ferreira', 'Julia Almeida'];
+    for (const query of searchQueries) {
+      if (results.length >= quantity) break;
 
-    const targetCount = Math.min(Number(quantity) || 10, validWebsites.length);
-    const usedWebsites = new Set();
+      try {
+        const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+        const response = await fetchWithTimeout(searchUrl, 20000);
 
-    for (let i = 0; i < targetCount; i++) {
-      let website = validWebsites[i % validWebsites.length];
-      while (usedWebsites.has(website) && usedWebsites.size < validWebsites.length) {
-        website = validWebsites[Math.floor(Math.random() * validWebsites.length)];
+        if (response?.ok) {
+          const html = await response.text();
+          const linkRegex = /<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+          let match;
+
+          while ((match = linkRegex.exec(html)) !== null && results.length < quantity) {
+            const href = match[1];
+            const title = match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            const website = normalizeWebsiteUrl(href);
+
+            if (!website || seen.has(website) || title.length < 3) continue;
+            if (BLOCKED_DOMAINS.some(d => website.includes(d))) continue;
+
+            seen.add(website);
+
+            const websiteResponse = await fetchWithTimeout(website, 15000);
+            let emails = [];
+            let phones = [];
+
+            if (websiteResponse?.ok) {
+              const siteHtml = await websiteResponse.text().catch(() => '');
+              emails = extractEmailsFromText(siteHtml);
+              phones = extractPhonesFromText(siteHtml);
+            }
+
+            results.push({
+              id: `lead_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
+              name: title,
+              company: title,
+              website: website,
+              email: emails[0] || null,
+              phone: phones[0] || null,
+              whatsapp: phones.find(p => p.length === 11) || null,
+              source: 'DuckDuckGo Search',
+              status: 'qualified',
+              isValid: true,
+              isActive: true,
+              location: location,
+              industry: niche,
+              score: Math.floor(Math.random() * 30 + 70),
+              estimatedValue: Math.floor(Math.random() * 50000 + 15000),
+              captureMetric: config.captureMetric || niche,
+              metricCategory: config.captureMetric || niche,
+            });
+
+            if (results.length >= quantity) break;
+          }
+        }
+      } catch (error) {
+        console.warn('Search query failed:', error.message);
       }
-      usedWebsites.add(website);
-
-      const company = companies[i % companies.length];
-      const segment = segments[i % segments.length];
-      const city = cities[i % cities.length];
-      const contact = contacts[i % contacts.length];
-      const emailDomain = website.replace('https://www.', '').replace('http://', '');
-
-      mockLeads.push({
-        id: `mock_lead_${Date.now()}_${i}`,
-        company: `${company} ${i > 0 ? (i + 1) : ''}`.trim(),
-        contact: contact,
-        email: `comercial@${emailDomain}`,
-        phone: `11 9${Math.floor(Math.random() * 9000 + 1000)}-${Math.floor(Math.random() * 9000 + 1000)}`,
-        website: website,
-        source: 'auto_capture',
-        status: 'qualified',
-        industry: segment,
-        location: city,
-        isActive: true,
-        score: Math.floor(Math.random() * 30 + 70),
-        estimatedValue: Math.floor(Math.random() * 50000 + 15000),
-        captureMetric: captureMetric,
-        metricCategory: captureMetric,
-      });
     }
-    return mockLeads;
+
+    return results;
   }
 
   startProgressPulse(jobId, quantity) {
@@ -147,8 +214,8 @@ export class LeadCaptureService {
     try {
       return await this.requestBackendCapture(config);
     } catch (error) {
-      console.warn('Backend capture unavailable, generating mock leads:', error.message);
-      return this.generateMockLeads(config);
+      console.warn('Backend capture unavailable, using real capture:', error.message);
+      return await this.realCapture(config);
     }
   }
 
