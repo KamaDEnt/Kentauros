@@ -10,11 +10,11 @@ import Textarea from '../components/ui/Textarea';
 import { buildTaskPrompt, deriveDiscoveryKnowledge, getDeveloperBacklog } from '../services/operationalWorkflow';
 
 const columns = [
-  { id: 'todo', title: 'A fazer' },
-  { id: 'in_progress', title: 'Em andamento' },
-  { id: 'review', title: 'Validação' },
-  { id: 'done', title: 'Concluído' },
-  { id: 'blocked', title: 'Bloqueado' },
+  { id: 'todo', name: 'A fazer' },
+  { id: 'in_progress', name: 'Em andamento' },
+  { id: 'review', name: 'Validação' },
+  { id: 'done', name: 'Concluído' },
+  { id: 'blocked', name: 'Bloqueado' },
 ];
 
 const Backlog = () => {
