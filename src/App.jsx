@@ -27,6 +27,7 @@ import CodeGenerator from './pages/CodeGenerator';
 import Audit from './pages/Audit';
 import SmartLogs from './pages/SmartLogs';
 import Productivity from './pages/Productivity';
+import CEO from './pages/CEO';
 
 function App() {
   const { user, loading } = useApp();
@@ -60,6 +61,10 @@ function App() {
         <Route path="/prototypes" element={hasPermission('ux') ? <Prototypes /> : <Navigate to="/" />} />
         <Route path="/opencode" element={hasPermission('dev') || hasPermission('qa') ? <CodeGenerator /> : <Navigate to="/" />} />
         
+        {/* CEO Agent */}
+        <Route path="/ceo" element={hasPermission('admin') ? <CEO /> : <Navigate to="/" />} />
+        <Route path="/ceo/:projectId" element={hasPermission('admin') ? <CEO /> : <Navigate to="/" />} />
+
         {/* Enterprise Modules */}
         <Route path="/audit" element={hasPermission('audit') ? <Audit /> : <Navigate to="/" />} />
         <Route path="/smart-logs" element={hasPermission('logs') ? <SmartLogs /> : <Navigate to="/" />} />
