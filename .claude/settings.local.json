@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx eslint *)",
+      "Bash(node --check src/pages/Proposals.jsx)",
+      "Bash(npm run *)",
+      "Bash(Get-Content \"C:\\\\Users\\\\mathe\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-mathe-Documents-Kentauros\\\\fb1c3b57-1859-49c1-8d1f-447b2e6b85c1\\\\tasks\\\\bt56u9gwk.output\" -Tail 20)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(vercel --version)",
+      "Bash(npm i *)",
+      "Bash(vercel --prod)",
+      "mcp__plugin_vercel_vercel__deploy_to_vercel"
+    ]
+  }
+}
