@@ -6,20 +6,35 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'accept-language': 'pt-BR,pt;q=0.9,en;q=0.7',
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36',
-      },
-    });
+    // Try allorigins proxy first
+    let html = null;
+    try {
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      const response = await fetch(proxyUrl, {
+        headers: {
+          'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'accept-language': 'pt-BR,pt;q=0.9,en;q=0.7',
+        },
+      });
+      if (response.ok) {
+        html = await response.text();
+      }
+    } catch {}
 
-    if (!response.ok) {
-      return res.status(200).json({ emails: [], phones: [] });
+    // Fallback to corsproxy.io
+    if (!html) {
+      try {
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+        const response = await fetch(proxyUrl);
+        if (response.ok) {
+          html = await response.text();
+        }
+      } catch {}
     }
 
-    const html = await response.text();
+    if (!html) {
+      return res.status(200).json({ emails: [], phones: [] });
+    }
 
     const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
     const emails = html.match(emailRegex) || [];

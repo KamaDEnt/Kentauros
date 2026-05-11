@@ -6,22 +6,35 @@ export default async function handler(req, res) {
   }
 
   try {
-    const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`;
-    const response = await fetch(searchUrl, {
-      method: 'GET',
-      headers: {
-        'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'accept-language': 'pt-BR,pt;q=0.9,en;q=0.7',
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36',
-      },
-    });
+    const targetUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`;
 
-    if (!response.ok) {
-      return res.status(response.status).json({ error: 'Search failed' });
-    }
+    // Try allorigins proxy first (most reliable for CORS)
+    try {
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+      const response = await fetch(proxyUrl, {
+        headers: {
+          'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'accept-language': 'pt-BR,pt;q=0.9,en;q=0.7',
+        },
+      });
 
-    const html = await response.text();
-    res.status(200).json({ html });
+      if (response.ok) {
+        const html = await response.text();
+        return res.status(200).json({ html, source: 'allorigins' });
+      }
+    } catch {}
+
+    // Fallback to corsproxy.io
+    try {
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+      const response = await fetch(proxyUrl);
+      if (response.ok) {
+        const html = await response.text();
+        return res.status(200).json({ html, source: 'corsproxy' });
+      }
+    } catch {}
+
+    return res.status(503).json({ error: 'All proxies failed' });
   } catch (error) {
     console.error('Search error:', error);
     res.status(500).json({ error: 'Search failed' });
