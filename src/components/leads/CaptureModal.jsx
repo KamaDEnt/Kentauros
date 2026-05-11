@@ -164,10 +164,13 @@ const CaptureModal = ({ isOpen, onClose }) => {
     [results, resultsPage]
   );
 
+  const isProduction = window.location.hostname !== 'localhost' && !window.location.hostname.includes('.local');
+  const apiBase = isProduction ? window.location.origin : 'http://localhost:3001';
+
   const captureService = useMemo(() => new LeadCaptureService({
     updateCaptureJob,
     addCaptureResults
-  }), [updateCaptureJob, addCaptureResults]);
+  }, apiBase), [updateCaptureJob, addCaptureResults]);
 
   const handleStartCapture = async () => {
     if (!config.niche || !config.location) {

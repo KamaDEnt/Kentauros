@@ -59,17 +59,20 @@ export class LeadCaptureService {
     const seen = new Set();
 
     const doSearch = async (query) => {
-      if (this.baseUrl) {
-        try {
-          const response = await fetch(`${this.baseUrl}/api/search?q=${encodeURIComponent(query)}`, {
-            method: 'GET',
-            signal: AbortSignal.timeout(20000),
-          });
-          if (response?.ok) {
-            const data = await response.json();
-            return data.html || '';
-          }
-        } catch {}
+      try {
+        const url = this.baseUrl
+          ? `${this.baseUrl}/api/search?q=${encodeURIComponent(query)}`
+          : `/api/search?q=${encodeURIComponent(query)}`;
+        const response = await fetch(url, {
+          method: 'GET',
+          signal: AbortSignal.timeout(20000),
+        });
+        if (response?.ok) {
+          const data = await response.json();
+          return data.html || '';
+        }
+      } catch (err) {
+        console.warn('Search API failed:', err.message);
       }
       return null;
     };
@@ -97,7 +100,10 @@ export class LeadCaptureService {
           let emails = [];
           let phones = [];
           try {
-            const siteResponse = await fetch(`${this.baseUrl}/api/fetch-site?url=${encodeURIComponent(website)}`, {
+            const fetchUrl = this.baseUrl
+              ? `${this.baseUrl}/api/fetch-site?url=${encodeURIComponent(website)}`
+              : `/api/fetch-site?url=${encodeURIComponent(website)}`;
+            const siteResponse = await fetch(fetchUrl, {
               signal: AbortSignal.timeout(15000),
             });
             if (siteResponse?.ok) {
