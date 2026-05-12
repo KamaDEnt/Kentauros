@@ -333,7 +333,7 @@ async function searchWithBing(niche, location, quantity) {
 
       const url = new URL(CONFIG.BING_SEARCH_ENDPOINT);
       url.searchParams.set('q', query);
-      url.searchParams.set('count', Math.min(quantity, 50));
+      url.searchParams.set('count', String(Math.min(quantity, 50)));
 
       const response = await fetch(url.toString(), {
         headers: {
@@ -650,7 +650,21 @@ export async function POST(req) {
     console.log('[API] Bing Search:', CONFIG.BING_SEARCH_API_KEY ? 'SIM' : 'NÃO');
     console.log('[API] ========================================');
 
-    const stats = {
+    const stats: {
+      requested: number;
+      candidatesFound: number;
+      candidatesScanned: number;
+      domainValidated: number;
+      domainRejected: number;
+      duplicatesRemoved: number;
+      leadsQualified: number;
+      nicheMismatch: number;
+      locationMismatch: number;
+      rejectionReasons: Record<string, number>;
+      errors: string[];
+      sourcesAttempted: string[];
+      source: string;
+    } = {
       requested: requestedQuantity,
       candidatesFound: 0,
       candidatesScanned: 0,
@@ -663,6 +677,7 @@ export async function POST(req) {
       rejectionReasons: {},
       errors: [],
       sourcesAttempted: [],
+      source: 'none',
     };
 
     let rawLeads = [];
@@ -706,6 +721,7 @@ export async function POST(req) {
       } else {
         // No local database results either
         console.log('[API] Banco local não retornou resultados');
+        stats.source = 'none';
 
         // Check if this is a valid niche that exists but has no location data
         const nicheExists = Object.keys(LOCAL_DATABASE).some(key => {
