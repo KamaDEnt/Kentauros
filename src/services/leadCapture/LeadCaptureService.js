@@ -1,4 +1,7 @@
 // LeadCaptureService - Captura automática de leads com validação real
+import { WebsiteValidatorService } from './WebsiteValidatorService';
+import { LeadDeduplicationService } from './LeadDeduplicationService';
+import { RealWebsiteAnalyzer } from './RealWebsiteAnalyzer';
 
 // Database de nichos com empresas que têm sites reais e conhecidos
 // Em PRODUÇÃO: usar apenas sites de empresas reais verificadas
