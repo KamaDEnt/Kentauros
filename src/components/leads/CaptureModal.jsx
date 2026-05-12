@@ -735,83 +735,143 @@ const CaptureModal = ({ isOpen, onClose }) => {
     </div>
   );
 
-  const renderStep3 = () => (
-    <div className="flex flex-col gap-6 animate-fade-in">
-      <div className="capture-results-summary">
-        <div className="capture-result-card">
-          <div className="w-10 h-10 rounded-lg bg-info-dim flex items-center justify-center text-info">
-            <Search size={20} />
-          </div>
-          <div>
-            <div className="text-xs text-muted uppercase font-bold tracking-wider">{t('leads.capture.results.totalFound')}</div>
-            <div className="text-xl font-extrabold">{results.length}</div>
-          </div>
-        </div>
-        <div className="capture-result-card">
-          <div className="w-10 h-10 rounded-lg bg-success-dim flex items-center justify-center text-success">
-            <CheckCircle2 size={20} />
-          </div>
-          <div>
-            <div className="text-xs text-muted uppercase font-bold tracking-wider">{t('leads.capture.results.validLeads')}</div>
-            <div className="text-xl font-extrabold text-success">{currentJob?.total_valid || 0}</div>
-          </div>
-        </div>
-        <div className="capture-result-card">
-          <div className="w-10 h-10 rounded-lg bg-k-gold-dim flex items-center justify-center text-k-gold-500">
-            <Trophy size={20} />
-          </div>
-          <div>
-            <div className="text-xs text-muted uppercase font-bold tracking-wider">{t('leads.capture.results.avgScore')}</div>
-            <div className="text-xl font-extrabold text-k-gold-500">
-              {Math.round(results.reduce((acc, curr) => acc + curr.score, 0) / results.length) || 0}/100
-            </div>
-          </div>
-        </div>
-        <div className="capture-result-card">
-          <div className="w-10 h-10 rounded-lg bg-k-gold-dim flex items-center justify-center text-k-gold-500">
-            <ShieldCheck size={20} />
-          </div>
-          <div>
-            <div className="text-xs text-muted uppercase font-bold tracking-wider">Métrica</div>
-            <div className="text-sm font-bold text-primary">
-              {CAPTURE_METRICS.find(metric => metric.value === captureConfig.captureMetric)?.label}
-            </div>
-          </div>
-        </div>
-      </div>
+  const renderStep3 = () => {
+    // Calcular estatísticas
+    const stats = currentJob?.stats || {};
+    const totalFound = stats.candidatesFound || results.length;
+    const totalScanned = stats.candidatesScanned || 0;
+    const leadsQualified = stats.leadsQualified || currentJob?.total_valid || 0;
+    const avgScore = results.length > 0
+      ? Math.round(results.reduce((acc, curr) => acc + (curr.score || 0), 0) / results.length)
+      : 0;
 
-      <div className="capture-results-panel">
-        <div className="table-wrapper capture-results-table">
-          <table className="table table-sm m-0">
-            <thead className="sticky top-0 bg-surface z-10">
-              <tr>
-                <th className="w-12 text-center">
-                  <input
-                    type="checkbox"
-                    aria-label="Selecionar todos os leads válidos com email"
-                    className="accent-k-gold-500"
-                    checked={results.filter(l => l.isValid && l.email).length > 0 && selectedLeads.length === results.filter(l => l.isValid && l.email).length}
-                    onChange={handleSelectAll}
-                  />
-                </th>
-                <th>{t('leads.company')}</th>
-                <th>{t('leads.score')}</th>
-                <th>{t('leads.capture.results.channels')}</th>
-                <th>{t('common.status')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedResults.pageResults.map(lead => (
-                <tr key={lead.id} className={`${!lead.isValid || !lead.email ? 'opacity-50 grayscale-[0.5]' : 'hover:bg-bg-hover transition-colors'}`}>
-                  <td className="text-center">
+    // Se não há resultados, mostrar mensagem especial
+    if (results.length === 0) {
+      return (
+        <div className="flex flex-col gap-6 animate-fade-in">
+          <div className="capture-results-summary">
+            <div className="col-span-4">
+              <div className="bg-warning/10 border border-warning/30 rounded-xl p-6 text-center">
+                <div className="w-16 h-16 rounded-full bg-warning/20 flex items-center justify-center mx-auto mb-4">
+                  <Search size={32} className="text-warning" />
+                </div>
+                <h4 className="text-lg font-bold text-warning mb-2">Nenhum lead encontrado</h4>
+                <p className="text-sm text-muted mb-4">
+                  {currentJob?.phaseLabel || 'A captura não retornou resultados.'}
+                </p>
+                {stats.errors?.length > 0 && (
+                  <div className="bg-raised rounded-lg p-3 text-left text-xs">
+                    <strong className="text-danger">Erro:</strong>
+                    <span className="text-muted ml-1">{stats.errors[0]}</span>
+                  </div>
+                )}
+                <div className="mt-4 flex flex-col gap-2">
+                  <p className="text-xs text-muted">Sugestões:</p>
+                  <ul className="text-xs text-muted list-disc list-inside">
+                    <li>Amplie a localização (ex: "Brasil" em vez de cidade específica)</li>
+                    <li>Reduza os requisitos mínimos de contato</li>
+                    <li>Tente outro nicho</li>
+                    <li>Configure APIs de busca (Google Places, SerpAPI, Bing)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-center gap-3">
+            <Button variant="secondary" onClick={() => setStep(1)} icon={ChevronLeft}>
+              Ajustar Filtros
+            </Button>
+            <Button variant="primary" onClick={handleStartCapture} icon={Zap}>
+              Tentar Novamente
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-6 animate-fade-in">
+        <div className="capture-results-summary">
+          <div className="capture-result-card">
+            <div className="w-10 h-10 rounded-lg bg-info-dim flex items-center justify-center text-info">
+              <Search size={20} />
+            </div>
+            <div>
+              <div className="text-xs text-muted uppercase font-bold tracking-wider">{t('leads.capture.results.totalFound')}</div>
+              <div className="text-xl font-extrabold">{totalFound}</div>
+            </div>
+          </div>
+          <div className="capture-result-card">
+            <div className="w-10 h-10 rounded-lg bg-success-dim flex items-center justify-center text-success">
+              <CheckCircle2 size={20} />
+            </div>
+            <div>
+              <div className="text-xs text-muted uppercase font-bold tracking-wider">{t('leads.capture.results.validLeads')}</div>
+              <div className="text-xl font-extrabold text-success">{leadsQualified}</div>
+            </div>
+          </div>
+          <div className="capture-result-card">
+            <div className="w-10 h-10 rounded-lg bg-k-gold-dim flex items-center justify-center text-k-gold-500">
+              <Trophy size={20} />
+            </div>
+            <div>
+              <div className="text-xs text-muted uppercase font-bold tracking-wider">{t('leads.capture.results.avgScore')}</div>
+              <div className="text-xl font-extrabold text-k-gold-500">{avgScore}/100</div>
+            </div>
+          </div>
+          <div className="capture-result-card">
+            <div className="w-10 h-10 rounded-lg bg-k-gold-dim flex items-center justify-center text-k-gold-500">
+              <ShieldCheck size={20} />
+            </div>
+            <div>
+              <div className="text-xs text-muted uppercase font-bold tracking-wider">Métrica</div>
+              <div className="text-sm font-bold text-primary">
+                {CAPTURE_METRICS.find(metric => metric.value === captureConfig.captureMetric)?.label}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Mensagem se parcial */}
+        {stats.requested > leadsQualified && (
+          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 text-sm text-muted">
+            <strong className="text-warning">Atenção:</strong> Encontramos {leadsQualified} leads válidos de {stats.requested} solicitados.
+            Para mais resultados, amplie a localização ou reduza os requisitos mínimos.
+          </div>
+        )}
+
+        <div className="capture-results-panel">
+          <div className="table-wrapper capture-results-table">
+            <table className="table table-sm m-0">
+              <thead className="sticky top-0 bg-surface z-10">
+                <tr>
+                  <th className="w-12 text-center">
                     <input
                       type="checkbox"
-                      aria-label={`Selecionar ${lead.name}`}
+                      aria-label="Selecionar todos os leads válidos com email"
                       className="accent-k-gold-500"
-                      disabled={!lead.isValid || !lead.email}
-                      checked={selectedLeads.includes(lead.id)}
-                      onChange={() => handleToggleLead(lead.id)}
+                      checked={results.filter(l => l.isValid && l.email).length > 0 && selectedLeads.length === results.filter(l => l.isValid && l.email).length}
+                      onChange={handleSelectAll}
                     />
+                  </th>
+                  <th>{t('leads.company')}</th>
+                  <th>{t('leads.score')}</th>
+                  <th>{t('leads.capture.results.channels')}</th>
+                  <th>{t('common.status')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedResults.pageResults.map(lead => (
+                  <tr key={lead.id} className={`${!lead.isValid || !lead.email ? 'opacity-50 grayscale-[0.5]' : 'hover:bg-bg-hover transition-colors'}`}>
+                    <td className="text-center">
+                      <input
+                        type="checkbox"
+                        aria-label={`Selecionar ${lead.name}`}
+                        className="accent-k-gold-500"
+                        disabled={!lead.isValid || !lead.email}
+                        checked={selectedLeads.includes(lead.id)}
+                        onChange={() => handleToggleLead(lead.id)}
+                      />
                   </td>
                   <td>
                     <div className="font-bold text-sm text-primary">{lead.name}</div>
@@ -909,7 +969,8 @@ const CaptureModal = ({ isOpen, onClose }) => {
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   const renderStep4 = () => {
     const previewLead = results.find(l => l.id === selectedLeads[0]) || { name: 'Nome de Teste' };
