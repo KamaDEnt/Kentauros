@@ -83,8 +83,20 @@ export class LeadCaptureService {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Erro desconhecido' }));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        const errorData = await response.json().catch(() => null);
+        console.error('[LeadCaptureService] Response status:', response.status);
+        console.error('[LeadCaptureService] Response statusText:', response.statusText);
+        console.error('[LeadCaptureService] Error data:', errorData);
+
+        const errorMessage = errorData?.message
+          || errorData?.error
+          || `HTTP ${response.status}: ${response.statusText}`;
+
+        if (response.status === 405) {
+          throw new Error('A rota de captura não aceita POST. Verifique a implementação backend de /api/leads/capture.');
+        }
+
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -164,6 +176,13 @@ export class LeadCaptureService {
         errorMessage = 'Tempo limite excedido. Tente novamente ou reduza a quantidade.';
       } else if (error.message.includes('Failed to fetch')) {
         errorMessage = 'Não foi possível conectar ao servidor de captura. Verifique se o backend está rodando.';
+      }
+
+      // Try to parse error from response if available
+      if (error instanceof TypeError && error.cause?.response) {
+        const response = error.cause.response;
+        console.error('[LeadCaptureService] Response status:', response.status);
+        console.error('[LeadCaptureService] Response statusText:', response.statusText);
       }
 
       this.dataProvider.updateCaptureJob(jobId, {

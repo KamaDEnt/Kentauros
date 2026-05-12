@@ -639,13 +639,19 @@ export const DataProvider = ({ children }) => {
         setCaptureJobs(prev => prev.map(job => job.id === jobId ? { ...job, ...data } : job));
       },
       addCaptureResults: (jobId, results) => {
-        const formattedResults = results.map(res => ({
-          id: `res_${Math.random().toString(36).substr(2, 9)}`,
-          job_id: jobId,
-          tenant_id: tenantId,
-          ...res,
-          status: 'pending'
-        }));
+        if (!results || !Array.isArray(results)) {
+          console.warn('[DataContext] addCaptureResults: results inválido', results);
+          return;
+        }
+        const formattedResults = results
+          .filter(res => res != null)
+          .map(res => ({
+            id: `res_${Math.random().toString(36).substring(2, 11)}`,
+            job_id: jobId,
+            tenant_id: tenantId,
+            ...res,
+            status: 'pending'
+          }));
         setCaptureResults(prev => [...prev, ...formattedResults]);
       }
     }}>
