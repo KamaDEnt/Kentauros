@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useData } from '../../context/DataContext';
 import { useI18n } from '../../context/I18nContext';
 import { useApp } from '../../context/AppContext';
