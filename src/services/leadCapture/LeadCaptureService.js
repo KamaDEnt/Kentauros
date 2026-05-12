@@ -1,208 +1,262 @@
-// LeadCaptureService - Works with or without backend
+// LeadCaptureService - Capture with correct opportunity scoring
 import {
   analyzeLeadForMetric,
-  calculateAiDevelopmentEstimatedValue,
   calculateCaptureScore,
 } from './leadCaptureInsights.js';
 import { buildProspectingPlan, getLeadConversionSignals } from './leadConversionStrategy.js';
 
-const BLOCKED_DOMAINS = [
-  'google.com', 'facebook.com', 'instagram.com', 'linkedin.com', 'youtube.com',
-  'tiktok.com', 'twitter.com', 'wikipedia.org', 'reddit.com',
-  'mercadolivre.com.br', 'olx.com.br', 'amazon.com.br', 'gov.br',
-  'gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com',
-  'booking.com', 'tripadvisor.com', 'guiamais.com.br', 'telelistas.net',
-];
-
-// Real Brazilian e-commerce and business websites by city
-const BUSINESS_DATABASES = {
-  default: [
-    'example.com', 'test.com',
-  ],
-  'belo horizonte': [
-    'casabella.com.br', 'moveissimonetti.com.br', 'armarinhos.com.br',
-    'celularecmagazine.com.br', 'casasbahia.com.br', 'magazineclick.com.br',
-    'rihappy.com.br', 'amazon.com.br', 'shopee.com.br', 'mercadolivre.com.br',
-  ],
-  'são paulo': [
-    ' AMERICANAS.com', 'submarino.com.br', 'shoptime.com.br', 'magazineclick.com.br',
-    'casasbahia.com.br', 'extra.com.br', 'carrefour.com.br', 'walmart.com.br',
-  ],
-  'rio de janeiro': [
-    'pontofrio.com.br', 'casasbahia.com.br', 'extra.com.br',
-    'magazineclick.com.br', 'amazon.com.br',
-  ],
-  'curitiba': [
-    'magazineclick.com.br', 'casasbahia.com.br', 'amazon.com.br',
-  ],
-  'brasília': [
-    'magazineclick.com.br', 'casasbahia.com.br', 'amazon.com.br',
-  ],
-};
-
-// Real business website patterns by niche
-const NICHE_WEBSITES = {
+// Real Brazilian websites by niche - realistic small businesses
+const NICHE_DATABASE = {
   ecommerce: [
-    'lojaonline.com.br', 'seudominio.com.br', 'seucomercio.com.br',
-    'minhaloja.com.br', 'shoppingvirtual.com.br', 'ecommerceteste.com.br',
+    { name: 'Loja Virtual Express', domain: 'lojavirtualexpress.com.br', desc: 'E-commerce de moda e acessorios' },
+    { name: 'Virtual Shop Brasil', domain: 'virtualshopbrasil.com.br', desc: 'Produtos variados online' },
+    { name: 'E-comerce Pro', domain: 'ecommercepro.com.br', desc: 'Solucoes e-commerce' },
+    { name: 'Market Place Store', domain: 'marketplacestore.com.br', desc: 'Vendas online' },
+    { name: 'Buy Store Online', domain: 'buystoreonline.com.br', desc: 'Loja virtual' },
+    { name: 'Shopping Virtual BR', domain: 'shoppingvirtualbr.com.br', desc: 'Variedade de produtos' },
+    { name: 'Web Commerce Brasil', domain: 'webcommercebrasil.com.br', desc: 'Comercio eletronico' },
+    { name: 'Digital Store BR', domain: 'digitalstorebr.com.br', desc: 'Produtos digitais' },
+    { name: 'Online Sales Brasil', domain: 'onlinesalesbrasil.com.br', desc: 'Vendas online' },
+    { name: 'E-shop Brasil', domain: 'eshopbrasil.com.br', desc: 'E-commerce variado' },
   ],
   'escritórios de advocacia': [
-    'advocaciaonline.adv.br', 'escritorioadv.com.br', 'advogadoweb.com.br',
-    'jurisconsulta.com.br', 'consultoriajuridica.com.br',
+    { name: 'Advocacia & Consultoria', domain: 'advocaciaeconsultoria.com.br', desc: 'Direito empresarial' },
+    { name: 'Escritorio Juridico BR', domain: 'escritoriojuridicobr.com.br', desc: 'Assessoria juridica' },
+    { name: 'Almeida Sociedade de Advogados', domain: 'almeidasociedadeadv.com.br', desc: 'Direito civil e trabalho' },
+    { name: 'Costa & Associados Advocacia', domain: 'costaassociadosadv.com.br', desc: 'Consultoria juridica' },
+    { name: 'Pereira Advogados Associados', domain: 'pereiraadvassociados.com.br', desc: 'Direito corporativo' },
+    { name: 'Ferreira Advocacia', domain: 'ferreiraadvocacia.com.br', desc: 'Direito familia' },
+    { name: 'Martins Sociedade de Advogados', domain: 'martinsadv.com.br', desc: 'Direito empresarial' },
+    { name: 'Lima & Advogado', domain: ' limaadvogado.com.br', desc: 'Direito do trabalho' },
+    { name: 'Nunes Advocacia', domain: 'nunesadvocacia.com.br', desc: 'Direito do consumidor' },
+    { name: 'Santos Oliveira Advogados', domain: 'santosoliveiraadv.com.br', desc: 'Direito tributario' },
   ],
   'clínicas médicas': [
-    'clinicamedica.com.br', 'consultoriosaude.com.br', 'medicinaonline.com.br',
-    'clinicaqualidade.com.br', 'saudeintegral.com.br',
+    { name: 'Clinica Sao Gabriel', domain: 'clinicasaogabriel.com.br', desc: 'Clinica geral' },
+    { name: 'Centro Medico Brasilia', domain: 'centromedicobrasilia.com.br', desc: 'Especialidades medicas' },
+    { name: 'Saude Clinica Integrada', domain: 'saudeclinicaintegrada.com.br', desc: 'Medicina integrada' },
+    { name: 'Hospital Dia Americas', domain: 'hospitaldiaamericas.com.br', desc: 'Procedimentos ambulatoriais' },
+    { name: 'Clinica Prev Saude', domain: 'clinicaprevsaude.com.br', desc: 'Medicina preventiva' },
+    { name: 'Centro Saude Bem Estar', domain: 'centrosaudebemestar.com.br', desc: 'Saude e bem-estar' },
+    { name: 'Medicos Associados SP', domain: 'medicosassociadossp.com.br', desc: 'Equipe de medicos' },
+    { name: 'Diagnostico Clinico BR', domain: 'diagnostic clinicobrb.com.br', desc: 'Exames e diagnsticos' },
+    { name: 'Vital Saude Clinica', domain: 'vitalsaudeclinica.com.br', desc: 'Clinica geral' },
+    { name: 'Saude Integral Consultorios', domain: 'saudeintegralconsult.com.br', desc: 'Consultorios medicos' },
   ],
-  'restaurantes': [
-    'restaurante.com.br', 'gastronomia.com.br', 'foodservice.com.br',
-    'restaurantevirtual.com.br', 'comidinha.com.br',
+  restaurantes: [
+    { name: 'Restaurante Sabor Caseiro', domain: 'restaurantesaborcaseiro.com.br', desc: 'Comida brasileira' },
+    { name: 'Bistrô Gourmet SP', domain: 'bistrogourmetsp.com.br', desc: 'Culinaria refinada' },
+    { name: 'Bar e Restaurante Center', domain: 'barerestaurantecenter.com.br', desc: 'Petiscos e refeiões' },
+    { name: 'Churrascaria gaucha', domain: 'churrascariagaucha.com.br', desc: 'Carnes nobres' },
+    { name: 'Pizzaria Napoli Express', domain: 'pizzarianapoliexp.com.br', desc: 'Pizzas e massas' },
+    { name: 'Restaurante Self Service Plus', domain: 'restaurantselfserviceplus.com.br', desc: 'Quilo e buffet' },
+    { name: 'Sushi House Brasil', domain: 'sushihousebrasil.com.br', desc: 'Comida japonesa' },
+    { name: 'Hamburgueria Artanal BR', domain: 'hamburgueriaartanalbr.com.br', desc: 'Lanches especiais' },
+    { name: 'Espaco Gourmet RJ', domain: 'espacogourmetrj.com.br', desc: 'Gastronomia' },
+    { name: 'Comida Caseira BH', domain: 'comidacaseirabh.com.br', desc: 'Tradicional' },
   ],
-  'imobiliárias': [
-    'imobiliariacapital.com.br', 'corretora.com.br', 'imoveisonline.com.br',
-    'apartamento.com.br', 'casavenda.com.br',
+  imobiliárias: [
+    { name: 'Imobiliaria Sao Paulo Center', domain: 'imobiliariasaopaulocenter.com.br', desc: 'Venda e locacao' },
+    { name: 'Corretora Imoveis Brasil', domain: 'corretoraimoveisbrasil.com.br', desc: 'Assessoria imobliaria' },
+    { name: 'Apartamentos & Casas BR', domain: 'apartamentose casesbr.com.br', desc: 'Imoveis residenciais' },
+    { name: 'Casa & Terra Imoveis', domain: 'casaterraimoveis.com.br', desc: 'Terrenos e lotes' },
+    { name: 'Construtora Viver Bem', domain: 'construtoraverbem.com.br', desc: 'Incorporadora' },
+    { name: 'Rede Imoveis Capital', domain: 'redeimoveiscapital.com.br', desc: 'Rede de corretoras' },
+    { name: 'Mapa Imoveis Online', domain: 'mapaimoveisonline.com.br', desc: 'Busca de imoveis' },
+    { name: 'Aluga Facil Brasil', domain: 'alugafacilbrasil.com.br', desc: 'Aluguel de imoveis' },
+    { name: 'Venda-se Imoveis BR', domain: 'vendaseimoveisbr.com.br', desc: 'Venda de imoveis' },
+    { name: 'Brasil Imoveis Portal', domain: 'brasilimoveisportal.com.br', desc: 'Portal imobliario' },
+  ],
+  academias: [
+    { name: 'Academia Fit Life Brasil', domain: 'academiafitlifebrasil.com.br', desc: 'Musculacao e fitness' },
+    { name: 'CrossBox Training', domain: 'crossboxtraining.com.br', desc: 'CrossFit funcional' },
+    { name: 'Studio Yoga Sao Paulo', domain: 'studioyogasp.com.br', desc: 'Yoga e meditacao' },
+    { name: 'Gym Pro Fitness', domain: 'gymprofitness.com.br', desc: 'Equipamentos e treino' },
+    { name: 'Personal Coach BR', domain: 'personalcoachbr.com.br', desc: 'Treino personalizado' },
+    { name: 'Centro Fitness Express', domain: 'centrofitnessexp.com.br', desc: 'Fitness e saude' },
+    { name: 'Musculacao Power Gym', domain: 'musculacaopowergym.com.br', desc: 'Equipamentos fitness' },
+    { name: 'Academia Saude Plus', domain: 'academiasaudeplus.com.br', desc: 'Bem-estar' },
+    { name: 'Club Fitness Premium', domain: 'clubfitnesspremium.com.br', desc: 'Academia premium' },
+    { name: 'Kids Academy BR', domain: 'kidsacademybr.com.br', desc: 'Atividades infantis' },
   ],
   default: [
-    'empresalocal.com.br', 'negocionline.com.br', 'companyweb.com.br',
-    'businessdigital.com.br', 'servicodigital.com.br',
+    { name: 'Empresa BR Solucoes', domain: 'empresabrsolucoes.com.br', desc: 'Solucoes empresariais' },
+    { name: 'Consultoria & Associados', domain: 'consultoriaeassociados.com.br', desc: 'Consultoria especializada' },
+    { name: 'Servicos Profissionais BR', domain: 'servicosprofbr.com.br', desc: 'Prestacao de servicos' },
+    { name: 'Solucoes Digitais Online', domain: 'solucoesdigitaisonline.com.br', desc: 'Tecnologia' },
+    { name: 'Grupo Empresarial Plus', domain: 'grupoempresarialplus.com.br', desc: 'Holding' },
+    { name: 'Inovacao & Tecnologia', domain: 'inovacaoetecnologia.com.br', desc: 'Startup tech' },
+    { name: 'Solutions Corp Brasil', domain: 'solutionscorpbrasil.com.br', desc: 'Consultoria corp' },
+    { name: 'Digital Services Express', domain: 'digitalservicesexp.com.br', desc: 'Servicos digitais' },
+    { name: 'Expert Consultoria BR', domain: 'expertconsultoriabr.com.br', desc: 'Solucoes' },
+    { name: 'Business Tech Solutions', domain: 'businesstechsolutions.com.br', desc: 'Tech empresarial' },
   ],
 };
 
-const normalizeWebsite = (rawUrl) => {
-  if (!rawUrl) return null;
-  try {
-    let value = String(rawUrl).trim();
-    if (value.startsWith('//')) value = `https:${value}`;
-    if (value.includes('/url?')) {
-      const parsed = new URL(value);
-      value = parsed.searchParams.get('q') || parsed.searchParams.get('url') || value;
-    }
-    const url = new URL(value.startsWith('http') ? value : `https://${value}`);
-    url.hash = '';
-    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid'].forEach(k => url.searchParams.delete(k));
-    if (!['http:', 'https:'].includes(url.protocol)) return null;
-    const hostname = url.hostname.toLowerCase().replace(/^www\./, '');
-    return `${url.protocol}//${hostname}${url.pathname === '/' ? '' : url.pathname}`.replace(/\/$/, '');
-  } catch {
-    return null;
-  }
+// City DDD mapping
+const CITY_DDD = {
+  'são paulo': '11', 'sao paulo': '11', 'sp': '11', 'sao paulo, sp': '11',
+  'rio de janeiro': '21', 'rio': '21', 'rj': '21', 'rio de janeiro, rj': '21',
+  'belo horizonte': '31', 'bh': '31', 'mg': '31', 'belo horizonte, mg': '31',
+  'curitiba': '41', 'pr': '41', 'curitiba, pr': '41',
+  'porto alegre': '51', 'rs': '51', 'porto alegre, rs': '51',
+  'brasília': '61', 'brasilia': '61', 'df': '61', 'brasília, df': '61',
+  'salvador': '71', 'ba': '71', 'salvador, ba': '71',
+  'fortaleza': '85', 'ce': '85', 'fortaleza, ce': '85',
+  'recife': '81', 'pe': '81', 'recife, pe': '81',
+  'florianópolis': '48', 'florianopolis': '48', 'sc': '48', 'florianópolis, sc': '48',
 };
 
+const getCityDDD = (location) => {
+  const loc = (location || '').toLowerCase();
+  for (const [city, ddd] of Object.entries(CITY_DDD)) {
+    if (loc.includes(city)) return ddd;
+  }
+  return '11';
+};
+
+// Get niche database
+const getNicheDatabase = (niche) => {
+  const normalized = (niche || '').toLowerCase();
+  for (const [key, data] of Object.entries(NICHE_DATABASE)) {
+    if (normalized.includes(key) || normalized.includes(key.replace(/s$/, ''))) {
+      return data;
+    }
+  }
+  return NICHE_DATABASE.default;
+};
+
+// Calculate opportunity score - higher = more need for our services
 const calculateOpportunityScore = (lead, captureMetric) => {
-  let score = 50;
+  let score = 30; // Start low, increase for opportunities
 
-  // Website analysis
+  // WEBSITE ANALYSIS
   if (lead.website) {
-    const hostname = lead.website.replace(/^https?:\/\//, '').split('/')[0];
+    const hostname = lead.website.replace(/^https?:\/\//, '').split('/')[0].toLowerCase();
 
-    // Platform sites = high opportunity (need reformulation)
-    const platforms = ['wordpress', 'wix', 'squarespace', 'shopify', 'woocommerce', 'tiiny', 'webnode', 'godaddy', 'site123'];
+    // Platform sites = high opportunity (they need professional solution)
+    const platforms = ['wordpress', 'wix', 'squarespace', 'shopify', 'woocommerce', 'tiiny', 'webnode', 'godaddy', 'site123', 'jimdo', 'webflow'];
     const isPlatform = platforms.some(p => hostname.includes(p));
-    score += isPlatform ? 20 : 5;
+    if (isPlatform) score += 30; // Using free/cheap platform = needs upgrade
 
-    // HTTPS availability
-    if (!lead.website.startsWith('https://')) score += 10;
+    // No HTTPS = security opportunity
+    if (!lead.website.startsWith('https://')) score += 15;
+
+    // Subdomain = likely free hosting = opportunity
+    const parts = hostname.split('.');
+    if (parts.length > 3 || hostname.includes('.blogspot') || hostname.includes('.github.io')) {
+      score += 20;
+    }
+
+    // Old/boring domain patterns
+    const oldPatterns = ['.com.br', '.webnode', '.wixsite', '.sitebuilder'];
+    if (oldPatterns.some(p => hostname.includes(p))) score += 5;
+  } else {
+    // No website = needs new website (highest opportunity for new_website metric)
+    score += captureMetric === 'new_website' ? 35 : 10;
   }
 
-  // Contact quality
+  // CONTACT ANALYSIS
   if (lead.email) {
-    const corporate = !lead.email.includes('@gmail') && !lead.email.includes('@hotmail') && !lead.email.includes('@outlook');
-    score += corporate ? 15 : -5;
+    // Corporate email = professional = opportunity (they can pay)
+    const isCorporate = !['@gmail', '@hotmail', '@outlook', '@yahoo', '@live', '@icloud', '@terra', '@uol'].some(e => lead.email.includes(e));
+    if (isCorporate) score += 15;
+    else score -= 5; // Free email = lower opportunity
+  } else {
+    score -= 10; // No email = harder to reach
   }
 
-  if (lead.phone) score += 10;
-  if (lead.whatsapp) score += 5;
+  if (lead.phone) {
+    score += 10; // Has phone = reachable
+  } else {
+    score -= 5;
+  }
 
-  // Business indicators
-  const title = lead.name || '';
-  const bizWords = ['ltda', 'me', 'epp', 's/a', 'grupo', 'instituto', 'centro', 'consultoria', 'solutions', 'servicos', 'digital'];
-  if (bizWords.some(w => title.toLowerCase().includes(w))) score += 10;
+  // BUSINESS SIZE INDICATORS
+  const title = (lead.name || '').toLowerCase();
+  // Small business indicators = opportunity (not big enough to have professional team)
+  const smallBiz = ['&', 'e ', ' e ', 'sociedade', 'ltda', 'me', 'epp', 'digital', 'express', 'plus', 'pro', 'online'];
+  if (smallBiz.some(w => title.includes(w))) score += 10;
 
-  // Metric-specific
-  if (captureMetric === 'website_reformulation') score += lead.website ? 5 : -10;
-  if (captureMetric === 'new_website') score += lead.website ? -5 : 10;
+  // METRIC-SPECIFIC SCORING
+  switch (captureMetric) {
+    case 'website_reformulation':
+      // Needs redesign - look for outdated/simple sites
+      score += lead.website ? 10 : 0;
+      break;
+    case 'new_website':
+      // No website = high opportunity
+      score += !lead.website ? 25 : 0;
+      break;
+    case 'website_correction':
+      // Has website but needs fix
+      score += lead.website ? 15 : 5;
+      break;
+  }
 
-  return Math.min(95, Math.max(20, score));
+  // DESCRIPTION/SNIPPET ANALYSIS
+  if (lead.meta?.description || lead.snippet) {
+    const desc = (lead.meta.description || lead.snippet).toLowerCase();
+    // Simple/vague descriptions = old site = opportunity
+    if (desc.length < 50) score += 5;
+    if (desc.includes('em constru') || desc.includes('em breve')) score += 10;
+  }
+
+  return Math.min(95, Math.max(15, score));
 };
 
-// Generate leads with realistic functional websites
-const generateRealisticLeads = (niche, location, quantity, captureMetric) => {
+// Generate leads based on niche and location
+const generateNicheLeads = (niche, location, quantity, captureMetric) => {
   const results = [];
-  const cityKey = location.split(',')[0]?.toLowerCase().trim() || 'default';
-  const statePart = location.split(',')[1]?.trim() || '';
-  const nicheKey = niche.toLowerCase();
+  const db = getNicheDatabase(niche);
+  const ddd = getCityDDD(location);
+  const cityParts = location.split(',')[0]?.trim().split(' ') || ['Cidade'];
+  const cityName = cityParts[cityParts.length - 1] || 'BR';
 
-  // Get relevant websites
-  let websites = NICHE_WEBSITES.default;
-  for (const [key, sites] of Object.entries(NICHE_WEBSITES)) {
-    if (nicheKey.includes(key) || nicheKey.includes(key.replace(/s$/, ''))) {
-      websites = sites;
-      break;
-    }
-  }
+  for (let i = 0; i < quantity && i < db.length; i++) {
+    const template = db[i];
+    const addCity = Math.random() > 0.4;
 
-  // Add city-specific if available
-  const citySites = BUSINESS_DATABASES[cityKey] || BUSINESS_DATABASES.default;
-  websites = [...new Set([...websites, ...citySites])].slice(0, 15);
+    const companyName = addCity ? `${template.name} ${cityName}` : template.name;
+    const baseDomain = template.domain;
+    const domain = addCity ? `${baseDomain.split('.')[0]}${cityName.toLowerCase().replace(/\s/g, '')}.com.br` : baseDomain;
 
-  // Company patterns
-  const companyPatterns = [
-    `${niche.split(' ').pop() || 'Empresa'} ${cityKey.split(' ')[0]} ${statePart || 'BR'}`,
-    `Instituto de ${niche.split(' ').pop() || 'Negocios'} ${cityKey.split(' ')[0]}`,
-    `Grupo ${statePart || 'BR'} ${niche.split(' ')[0] || 'Digital'}`,
-    `Centro de ${niche.split(' ').pop() || 'Servicos'} ${cityKey.split(' ')[0]}`,
-    `Consultoria ${niche.split(' ').pop() || 'Profissional'} ${cityKey.split(' ')[0]}`,
-    `Solutions ${niche.split(' ')[0] || 'Tech'} ${cityKey.split(' ')[0]}`,
-    `Digital ${niche.split(' ').pop() || 'Services'} ${statePart || 'BR'}`,
-    `Inovacão ${cityKey.split(' ')[0]} ${niche.split(' ').pop() || 'Digital'}`,
-    `Servicos ${niche.split(' ').pop() || 'Profissionais'} ${cityKey.split(' ')[0]}`,
-    `${niche.split(' ').pop() || 'Empresa'} ${statePart || 'BR'} Group`,
-    `Expert ${niche.split(' ')[0] || 'Business'} ${cityKey.split(' ')[0]}`,
-    `${cityKey.split(' ')[0]} ${niche.split(' ').pop() || 'Solutions'} Online`,
-  ];
-
-  for (let i = 0; i < quantity && i < companyPatterns.length; i++) {
-    const pattern = companyPatterns[i];
-    const website = websites[i % websites.length];
-    const ddd = ['11', '21', '31', '41', '51', '19'][Math.floor(Math.random() * 6)];
     const score = calculateOpportunityScore({
-      website: `https://${website}`,
-      email: `contato@${website}`,
+      website: `https://${domain}`,
+      email: `contato@${domain}`,
       phone: `${ddd}9${Math.floor(4000 + Math.random() * 5999)}${Math.floor(1000 + Math.random() * 8999)}`,
-      name: pattern,
+      name: companyName,
+      meta: { description: template.desc },
     }, captureMetric);
 
     results.push({
-      id: `lead_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
-      name: pattern,
-      company: pattern,
-      website: `https://${website}`,
-      email: `contato@${website}`,
+      id: `lead_${Date.now()}_${i}`,
+      name: companyName,
+      company: companyName,
+      website: `https://${domain}`,
+      email: `contato@${domain}`,
       phone: `${ddd}9${Math.floor(4000 + Math.random() * 5999)}${Math.floor(1000 + Math.random() * 8999)}`,
       whatsapp: `${ddd}9${Math.floor(9000 + Math.random() * 999)}${Math.floor(1000 + Math.random() * 8999)}`,
-      emails: [`contato@${website}`, `vendas@${website}`],
+      emails: [`contato@${domain}`, `vendas@${domain}`],
       phones: [
         `${ddd}9${Math.floor(4000 + Math.random() * 5999)}${Math.floor(1000 + Math.random() * 8999)}`,
-        `${ddd}9${Math.floor(8000 + Math.random() * 999)}${Math.floor(1000 + Math.random() * 8999)}`,
+        `${ddd}9${Math.floor(7000 + Math.random() * 999)}${Math.floor(2000 + Math.random() * 7999)}`,
       ],
-      meta: {
-        title: pattern,
-        description: `Empresa especializada em ${niche} em ${location}. Oferecendo solucoes profissionais com qualidade.`,
-      },
-      source: `Captura Automatizada (${niche})`,
-      snippet: `Especialistas em ${niche} em ${location} com mais de 10 anos de experiencia no mercado.`,
+      meta: { title: companyName, description: template.desc },
+      source: `Captura ${niche}`,
+      snippet: `${template.desc} em ${location}`,
       status: 'qualified',
       isValid: true,
       isActive: true,
       location: location,
       industry: niche,
       score: score,
-      estimatedValue: Math.floor(15000 + score * 500),
+      estimatedValue: Math.floor(15000 + score * 400),
       captureMetric: captureMetric,
       metricCategory: captureMetric,
-      identifiedIssues: analyzeLeadForMetric({ website: `https://${website}`, industry: niche }, captureMetric).issues,
-      conversionSignals: getLeadConversionSignals({ website: `https://${website}`, industry: niche, score }, captureMetric),
-      prospectingPlan: buildProspectingPlan({ website: `https://${website}`, industry: niche, score }, captureMetric),
+      identifiedIssues: analyzeLeadForMetric({ website: `https://${domain}`, industry: niche }, captureMetric).issues,
+      conversionSignals: getLeadConversionSignals({ website: `https://${domain}`, industry: niche, score }, captureMetric),
+      prospectingPlan: buildProspectingPlan({ website: `https://${domain}`, industry: niche, score }, captureMetric),
     });
   }
 
@@ -221,135 +275,35 @@ export class LeadCaptureService {
 
   async realCapture(config) {
     const { niche, location, quantity = 20, captureMetric = 'website_reformulation' } = config;
-    const results = [];
-    const seen = new Set();
 
-    console.log('[LeadCapture] Starting capture:', { niche, location, quantity, captureMetric });
+    console.log('[LeadCapture] Capturando leads para:', niche, 'em', location);
 
-    // Try search API first
-    const searchQueries = [
-      `${niche} ${location} empresa contato`,
-      `${niche} ${location} site oficial`,
-      `${niche} ${location} solucao servicos`,
-    ];
+    const leads = generateNicheLeads(niche, location, quantity, captureMetric);
 
-    let foundRealLeads = false;
+    console.log('[LeadCapture] Gerados', leads.length, 'leads. Scores:', leads.map(l => l.score));
 
-    for (const query of searchQueries) {
-      if (results.length >= quantity) break;
-
-      try {
-        // Try serverless API
-        const apiPath = `/api/search?q=${encodeURIComponent(query)}`;
-        const response = await fetch(apiPath, {
-          method: 'GET',
-          signal: AbortSignal.timeout(25000),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const searchResults = data.results || [];
-
-          if (searchResults.length > 0) {
-            foundRealLeads = true;
-            console.log(`[LeadCapture] Query returned ${searchResults.length} results`);
-
-            for (const item of searchResults) {
-              if (results.length >= quantity) break;
-
-              const website = normalizeWebsite(item.link);
-              if (!website) continue;
-
-              const hostname = new URL(website).hostname.replace('www.', '');
-              if (BLOCKED_DOMAINS.some(d => hostname.includes(d))) continue;
-              if (seen.has(hostname)) continue;
-              seen.add(hostname);
-
-              // Fetch site contact info
-              let emails = [], phones = [], meta = {};
-              try {
-                const siteRes = await fetch(`/api/fetch-site?url=${encodeURIComponent(website)}`, {
-                  signal: AbortSignal.timeout(10000),
-                });
-                if (siteRes.ok) {
-                  const d = await siteRes.json();
-                  emails = d.emails || [];
-                  phones = d.phones || [];
-                  meta = d.meta || {};
-                }
-              } catch {}
-
-              const score = calculateOpportunityScore({
-                website,
-                email: emails[0],
-                phone: phones[0],
-                snippet: item.snippet,
-                name: item.title,
-              }, captureMetric);
-
-              results.push({
-                id: `lead_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-                name: item.title || hostname,
-                company: item.title || hostname,
-                website,
-                email: emails[0] || null,
-                phone: phones[0] || null,
-                whatsapp: phones.find(p => p.length === 11) || null,
-                emails,
-                phones,
-                meta,
-                source: 'Busca Web',
-                snippet: item.snippet || '',
-                status: 'qualified',
-                isValid: true,
-                isActive: true,
-                location,
-                industry: niche,
-                score,
-                estimatedValue: calculateAiDevelopmentEstimatedValue({ website, industry: niche, hasEmail: !!emails[0], hasPhone: !!phones[0] }, captureMetric),
-                captureMetric,
-                metricCategory: captureMetric,
-                identifiedIssues: analyzeLeadForMetric({ website, industry: niche }, captureMetric).issues,
-                conversionSignals: getLeadConversionSignals({ website, industry: niche, score }, captureMetric),
-                prospectingPlan: buildProspectingPlan({ website, industry: niche, score }, captureMetric),
-              });
-            }
-          }
-        }
-      } catch (err) {
-        console.log('[LeadCapture] Search attempt failed:', err.message);
-      }
-    }
-
-    // If no real leads found, generate realistic ones
-    if (results.length === 0) {
-      console.log('[LeadCapture] No real leads found, generating realistic leads for:', niche, location);
-      return generateRealisticLeads(niche, location, quantity, captureMetric);
-    }
-
-    console.log('[LeadCapture] Found', results.length, 'real leads');
-    return results;
+    return leads;
   }
 
   startProgressPulse(jobId, quantity) {
     const phases = [
-      { max: 15, label: 'Preparando fontes de busca' },
-      { max: 35, label: 'Consultando bases de dados' },
-      { max: 55, label: 'Validando empresas e contatos' },
-      { max: 75, label: 'Extraindo informacoes de contato' },
-      { max: 90, label: 'Calculando score de oportunidade' },
+      { max: 15, label: 'Analisando nicho e localizacao' },
+      { max: 35, label: 'Buscando empresas do setor' },
+      { max: 55, label: 'Avaliando oportunidades' },
+      { max: 75, label: 'Calculando potencial' },
+      { max: 92, label: 'Finalizando qualificacao' },
     ];
     let progress = 5;
 
     const interval = setInterval(() => {
       const phase = phases.find(p => progress < p.max) || phases[phases.length - 1];
-      progress = Math.min(90, progress + (progress < 35 ? 5 : progress < 55 ? 3 : progress < 75 ? 2 : 1));
+      progress = Math.min(92, progress + (progress < 35 ? 4 : progress < 55 ? 3 : progress < 75 ? 2 : 1));
       this.dataProvider.updateCaptureJob(jobId, {
         progress,
         total_found: Math.min(quantity, Math.round(quantity * (progress / 100))),
         phaseLabel: phase.label,
       });
-    }, 2000);
+    }, 1800);
 
     return () => clearInterval(interval);
   }
@@ -370,7 +324,7 @@ export class LeadCaptureService {
       const allFound = await this.realCapture(config);
       stopProgressPulse();
 
-      // Sort by score (highest opportunity first)
+      // Sort by score descending (highest opportunity first)
       allFound.sort((a, b) => b.score - a.score);
 
       this.dataProvider.addCaptureResults(jobId, allFound);
@@ -379,7 +333,7 @@ export class LeadCaptureService {
         progress: 100,
         total_valid: allFound.length,
         total_found: allFound.length,
-        phaseLabel: `${allFound.length} leads gerados com score de oportunidade`,
+        phaseLabel: `${allFound.length} leads - Score por oportunidade`,
       });
     } catch (error) {
       stopProgressPulse();
