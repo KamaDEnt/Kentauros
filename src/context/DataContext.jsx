@@ -643,16 +643,33 @@ export const DataProvider = ({ children }) => {
           console.warn('[DataContext] addCaptureResults: results inválido', results);
           return;
         }
-        const formattedResults = results
-          .filter(res => res != null)
-          .map(res => ({
-            id: `res_${Math.random().toString(36).substring(2, 11)}`,
-            job_id: jobId,
-            tenant_id: tenantId,
-            ...res,
-            status: 'pending'
-          }));
-        setCaptureResults(prev => [...prev, ...formattedResults]);
+        // Clear previous results for this job before adding new ones
+        setCaptureResults(prev => {
+          // Remove any existing results for this job
+          const filtered = prev.filter(r => r.job_id !== jobId);
+          const formattedResults = results
+            .filter(res => res != null)
+            .map(res => ({
+              id: `res_${Math.random().toString(36).substring(2, 11)}`,
+              job_id: jobId,
+              tenant_id: tenantId,
+              ...res,
+              status: 'pending'
+            }));
+          return [...filtered, ...formattedResults];
+        });
+      },
+      clearCaptureResults: (jobId) => {
+        setCaptureResults(prev => {
+          if (jobId) {
+            return prev.filter(r => r.job_id !== jobId);
+          }
+          return [];
+        });
+      },
+      clearAllCaptureJobs: () => {
+        setCaptureJobs([]);
+        setCaptureResults([]);
       }
     }}>
       {children}

@@ -9,10 +9,17 @@ export class LeadCaptureService {
     this.isDev = import.meta.env?.DEV || process.env?.NODE_ENV === 'development';
   }
 
+  // Clear capture results for a job
+  clearResults(jobId) {
+    if (this.dataProvider.clearCaptureResults) {
+      this.dataProvider.clearCaptureResults(jobId);
+    }
+  }
+
   // ============================================
   // CAPTURA PRINCIPAL - chama backend
   // ============================================
-  async runJob(jobId, config) {
+  async runJob(jobId, config, captureRunId = null) {
     const {
       niche,
       location,
@@ -23,11 +30,17 @@ export class LeadCaptureService {
 
     console.log('[LeadCaptureService] ═══════════════════════════════════════');
     console.log('[LeadCaptureService] ENVIANDO CAPTURA PARA BACKEND');
+    console.log('[LeadCaptureService] captureRunId:', captureRunId);
     console.log('[LeadCaptureService] Nicho:', niche);
     console.log('[LeadCaptureService] Localização:', location);
     console.log('[LeadCaptureService] Quantidade:', quantity);
     console.log('[LeadCaptureService] Métrica:', captureMetric);
     console.log('[LeadCaptureService] ═══════════════════════════════════════');
+
+    // Clear previous results before starting new capture
+    if (jobId) {
+      this.clearResults(jobId);
+    }
 
     // Atualizar job inicial
     this.dataProvider.updateCaptureJob(jobId, {
@@ -71,6 +84,7 @@ export class LeadCaptureService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          captureRunId,
           niche,
           location,
           quantity,
@@ -101,6 +115,21 @@ export class LeadCaptureService {
 
       const result = await response.json();
 
+      console.log('[LeadCaptureService] Resultado recebido para captureRunId:', result.captureRunId);
+
+      // Validate response matches current captureRunId
+      if (captureRunId && result.captureRunId !== captureRunId) {
+        console.warn('[LeadCaptureService] Resultado antigo ignorado! Expected:', captureRunId, 'Got:', result.captureRunId);
+        console.log('[LeadCaptureService] Resultado antigo ignorado: true');
+        return {
+          success: false,
+          ignored: true,
+          message: 'Resultado de captura anterior ignorado',
+        };
+      }
+
+      console.log('[LeadCaptureService] Resultado aplicado: true');
+
       console.log('[LeadCaptureService] ═══════════════════════════════════════');
       console.log('[LeadCaptureService] RESULTADO DO BACKEND');
       console.log('[LeadCaptureService] Success:', result.success);
@@ -126,7 +155,7 @@ export class LeadCaptureService {
         candidatesScanned: result.totalScanned || 0,
         domainValidated: result.totalScanned || 0,
         domainRejected: result.rejectedCount || 0,
-        duplicatesRemoved: 0,
+        duplicatesRemoved: result.stats?.duplicatesRemoved || 0,
         leadsQualified: result.qualifiedCount || 0,
         attempts: 1,
         errors: [],
@@ -145,8 +174,9 @@ export class LeadCaptureService {
         stats,
       });
 
-      // Adicionar resultados ao job
+      // Adicionar resultados ao job - CLEAR previous results first
       if (result.qualified && result.qualified.length > 0) {
+        this.dataProvider.clearCaptureResults(jobId);
         this.dataProvider.addCaptureResults(jobId, result.qualified);
       }
 
@@ -168,6 +198,22 @@ export class LeadCaptureService {
       };
 
     } catch (error) {
+      // Check if this error is due to abort (stale request)
+      if (error.name === 'AbortError') {
+        console.log('[LeadCaptureService] Requisição cancelada (captura mais recente iniciada)');
+        this.dataProvider.updateCaptureJob(jobId, {
+          status: 'cancelled',
+          progress: 100,
+          phaseLabel: 'Captura cancelada',
+          error: 'Captura cancelada devido a nova requisição',
+        });
+        return {
+          success: false,
+          cancelled: true,
+          message: 'Captura cancelada',
+        };
+      }
+
       console.error('[LeadCaptureService] ERRO:', error);
 
       let errorMessage = error.message;
@@ -176,13 +222,6 @@ export class LeadCaptureService {
         errorMessage = 'Tempo limite excedido. Tente novamente ou reduza a quantidade.';
       } else if (error.message.includes('Failed to fetch')) {
         errorMessage = 'Não foi possível conectar ao servidor de captura. Verifique se o backend está rodando.';
-      }
-
-      // Try to parse error from response if available
-      if (error instanceof TypeError && error.cause?.response) {
-        const response = error.cause.response;
-        console.error('[LeadCaptureService] Response status:', response.status);
-        console.error('[LeadCaptureService] Response statusText:', response.statusText);
       }
 
       this.dataProvider.updateCaptureJob(jobId, {
@@ -228,7 +267,6 @@ export class LeadCaptureService {
 
     const interval = setInterval(() => {
       if (progress < 85) {
-        // Progresso mais rápido no início, mais lento depois
         progress = Math.min(85, progress + (progress < 40 ? 8 : progress < 60 ? 5 : 2));
       }
       this.dataProvider.updateCaptureJob(jobId, {

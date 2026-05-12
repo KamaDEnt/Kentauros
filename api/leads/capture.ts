@@ -274,6 +274,7 @@ export async function POST(req) {
     }
 
     const {
+      captureRunId,
       niche,
       location,
       quantity = 20,
@@ -286,6 +287,7 @@ export async function POST(req) {
 
     console.log('[API] ========================================');
     console.log('[API] LEAD CAPTURE REQUEST');
+    console.log('[API] captureRunId:', captureRunId);
     console.log('[API] Nicho:', niche);
     console.log('[API] Localização:', location);
     console.log('[API] Quantidade:', requestedQuantity);
@@ -354,9 +356,10 @@ export async function POST(req) {
     console.log('[API] Leads qualificados:', qualified.length);
     console.log('[API] Duração:', duration + 'ms');
 
-    // Build response
+    // Build response - NO CACHE, return only current request results
     const response = {
       success: true,
+      captureRunId, // Return same captureRunId for validation
       requested: requestedQuantity,
       qualified,
       qualifiedCount: qualified.length,

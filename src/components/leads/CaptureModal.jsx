@@ -258,6 +258,8 @@ const CaptureModal = ({ isOpen, onClose }) => {
     startCaptureJob,
     updateCaptureJob,
     addCaptureResults,
+    clearCaptureResults,
+    clearAllCaptureJobs,
     captureJobs,
     captureResults,
     leads,
@@ -270,6 +272,13 @@ const CaptureModal = ({ isOpen, onClose }) => {
   const [currentJobId, setCurrentJobId] = useState(null);
   const [selectedLeads, setSelectedLeads] = useState([]);
   const [resultsPage, setResultsPage] = useState(1);
+
+  // Unique ID for each capture run to prevent race conditions
+  const [captureRunId, setCaptureRunId] = useState(null);
+  const [currentCaptureConfig, setCurrentCaptureConfig] = useState(null);
+
+  // AbortController for canceling previous requests
+  const captureAbortController = useRef(null);
 
   // Email state
   const [emailTemplate, setEmailTemplate] = useState({
@@ -315,10 +324,11 @@ const CaptureModal = ({ isOpen, onClose }) => {
     'Calculando score de qualidade'
   );
 
-  const results = useMemo(() =>
-    captureResults.filter(r => r.job_id === currentJobId),
-    [captureResults, currentJobId]
-  );
+  // Filter results for current job only and validate against capture run
+  const results = useMemo(() => {
+    if (!currentJobId) return [];
+    return captureResults.filter(r => r.job_id === currentJobId);
+  }, [captureResults, currentJobId]);
 
   const paginatedResults = useMemo(
     () => getPaginatedLeadResults(results, resultsPage),
@@ -327,8 +337,9 @@ const CaptureModal = ({ isOpen, onClose }) => {
 
   const captureService = useMemo(() => new LeadCaptureService({
     updateCaptureJob,
-    addCaptureResults
-  }), [updateCaptureJob, addCaptureResults]);
+    addCaptureResults,
+    clearCaptureResults
+  }), [updateCaptureJob, addCaptureResults, clearCaptureResults]);
 
   // Find labels for selected values
   const selectedNicheLabel = NICHE_OPTIONS.find(n => n.value === captureConfig.niche)?.label || '';
@@ -347,14 +358,41 @@ const CaptureModal = ({ isOpen, onClose }) => {
 
     console.log('[CaptureModal] Iniciando captura com config:', captureConfig);
 
-    const jobId = startCaptureJob(captureConfig);
-    setCurrentJobId(jobId);
-    setResultsPage(1);
-    setSelectedLeads([]);
-    setStep(2);
-    setCaptureDebug({ candidatesGenerated: 0, candidatesValidated: 0, totalResults: 0, lastError: null });
+    // Cancel any previous capture request
+    if (captureAbortController.current) {
+      captureAbortController.current.abort();
+      console.log('[CaptureModal] Requisição anterior cancelada');
+    }
 
-    captureService.runJob(jobId, captureConfig);
+    // Generate new capture run ID
+    const newCaptureRunId = crypto.randomUUID();
+    setCaptureRunId(newCaptureRunId);
+
+    // Clear all previous results
+    console.log('[CaptureModal] captureRunId:', newCaptureRunId);
+    console.log('[CaptureModal] Limpando estado anterior');
+
+    // Clear previous job results if any
+    if (currentJobId) {
+      clearCaptureResults(currentJobId);
+    }
+
+    // Reset all local state
+    setStep(1);
+    setStep(2); // Set step 2 after clearing
+    setSelectedLeads([]);
+    setResultsPage(1);
+    setCaptureDebug({ candidatesGenerated: 0, candidatesValidated: 0, totalResults: 0, lastError: null });
+    setCurrentCaptureConfig({ ...captureConfig });
+
+    // Create new job
+    const jobId = startCaptureJob({ ...captureConfig, captureRunId: newCaptureRunId });
+    setCurrentJobId(jobId);
+
+    console.log('[CaptureModal] Config atual:', captureConfig);
+    console.log('[CaptureModal] Job criado:', jobId);
+
+    captureService.runJob(jobId, captureConfig, newCaptureRunId);
   };
 
   // Update debug info when results change
@@ -552,6 +590,25 @@ const CaptureModal = ({ isOpen, onClose }) => {
 
   const handleGoBack = () => {
     setStep(prev => Math.max(1, prev - 1));
+  };
+
+  // Handle going back to step 1 - fully reset state
+  const handleGoToStep1 = () => {
+    console.log('[CaptureModal] Voltando para etapa 1 - limpando tudo');
+
+    // Clear capture results
+    if (currentJobId) {
+      clearCaptureResults(currentJobId);
+    }
+
+    // Reset all state
+    setStep(1);
+    setCurrentJobId(null);
+    setSelectedLeads([]);
+    setResultsPage(1);
+    setCaptureRunId(null);
+    setCurrentCaptureConfig(null);
+    setCaptureDebug({ candidatesGenerated: 0, candidatesValidated: 0, totalResults: 0, lastError: null });
   };
 
   const waitForNextSend = async (ms) => {
@@ -1155,12 +1212,18 @@ const CaptureModal = ({ isOpen, onClose }) => {
           </div>
           <div className="flex gap-3">
             {step === 2 && currentJob?.status === 'failed' && (
-              <Button variant="secondary" onClick={() => setStep(1)} icon={ChevronLeft}>
+              <Button variant="secondary" onClick={handleGoToStep1} icon={ChevronLeft}>
                 Voltar
               </Button>
             )}
 
-            {step > 2 && step !== 5 && (
+            {step === 3 && (
+              <Button variant="secondary" onClick={handleGoToStep1} icon={ChevronLeft}>
+                Alterar Filtros
+              </Button>
+            )}
+
+            {step > 3 && step !== 5 && (
               <Button variant="secondary" onClick={handleGoBack} icon={ChevronLeft}>
                 Voltar
               </Button>
