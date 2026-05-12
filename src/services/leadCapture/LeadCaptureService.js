@@ -140,6 +140,7 @@ export class LeadCaptureService {
       console.log('[LeadCaptureService] Rejected:', result.rejectedCount);
       console.log('[LeadCaptureService] Partial:', result.partial);
       console.log('[LeadCaptureService] Message:', result.message);
+      console.log('[LeadCaptureService] Error Code:', result.errorCode);
       console.log('[LeadCaptureService] ═══════════════════════════════════════');
 
       // Atualizar progresso para "finalizando"
@@ -162,33 +163,48 @@ export class LeadCaptureService {
         rejectionReasons: result.rejectionReasons || {},
       };
 
+      // CRITICAL: Determinar status correto
+      // success: false OU qualifiedCount: 0 = falha
+      const isSuccess = result.success === true && (result.qualifiedCount || 0) > 0;
+      const jobStatus = isSuccess ? 'completed' : 'failed';
+      const phaseMessage = result.errorCode
+        ? `[${result.errorCode}] ${result.message}`
+        : (isSuccess
+          ? (result.qualifiedCount > 0 ? `${result.qualifiedCount} leads qualificados` : 'Nenhum lead encontrado')
+          : result.message || 'Captura falhou');
+
       // Atualizar job final
       this.dataProvider.updateCaptureJob(jobId, {
-        status: result.success ? 'completed' : 'failed',
+        status: jobStatus,
         progress: 100,
         total_found: result.totalFound || 0,
         total_valid: result.qualifiedCount || 0,
-        phaseLabel: result.message || (result.qualifiedCount > 0
-          ? `${result.qualifiedCount} leads qualificados`
-          : 'Nenhum lead encontrado'),
+        phaseLabel: phaseMessage,
+        errorCode: result.errorCode || null,
         stats,
+        rawResponse: result, // Salvar resposta completa para debug
       });
 
-      // Adicionar resultados ao job - CLEAR previous results first
+      // Adicionar resultados ao job - apenas se houver leads
       if (result.qualified && result.qualified.length > 0) {
         this.dataProvider.clearCaptureResults(jobId);
         this.dataProvider.addCaptureResults(jobId, result.qualified);
+      } else {
+        // Limpar resultados se não houver leads
+        this.dataProvider.clearCaptureResults(jobId);
       }
 
       console.log('[LeadCaptureService] CAPTURA CONCLUÍDA');
+      console.log('[LeadCaptureService] Status:', jobStatus);
       console.log('[LeadCaptureService] Leads retornados:', result.qualified?.length || 0);
 
       return {
-        success: result.success,
+        success: isSuccess,
         leads: result.qualified || [],
         partial: result.partial || false,
         stats,
         message: result.message,
+        errorCode: result.errorCode || null,
         requested: result.requested,
         qualifiedCount: result.qualifiedCount,
         totalFound: result.totalFound,

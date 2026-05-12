@@ -8,7 +8,49 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
-// Local database for fallback - only use in development
+// ========================================
+// CONFIGURAÇÃO DE FONTES
+// ========================================
+const CONFIG = {
+  // API Keys (from environment)
+  GOOGLE_PLACES_API_KEY: process.env.GOOGLE_PLACES_API_KEY || '',
+  SERPAPI_API_KEY: process.env.SERPAPI_API_KEY || '',
+  BING_SEARCH_API_KEY: process.env.BING_SEARCH_API_KEY || '',
+  BING_SEARCH_ENDPOINT: process.env.BING_SEARCH_ENDPOINT || 'https://api.bing.microsoft.com/v7.0/search',
+
+  // Is production?
+  isProduction: process.env.NODE_ENV === 'production' || process.env.VERCEL === 'true',
+
+  // Max attempts for capture loop
+  maxAttempts: 5,
+
+  // Candidates per attempt
+  candidatesPerAttempt: 10,
+};
+
+// Check which sources are configured
+function getConfiguredSources() {
+  const sources = [];
+
+  if (CONFIG.GOOGLE_PLACES_API_KEY) {
+    sources.push('google_places');
+  }
+  if (CONFIG.SERPAPI_API_KEY) {
+    sources.push('serpapi');
+  }
+  if (CONFIG.BING_SEARCH_API_KEY) {
+    sources.push('bing_search');
+  }
+
+  return sources;
+}
+
+// Check if any real source is configured
+function hasRealSource() {
+  return CONFIG.GOOGLE_PLACES_API_KEY || CONFIG.SERPAPI_API_KEY || CONFIG.BING_SEARCH_API_KEY;
+}
+
+// Local database for development ONLY
 const LOCAL_DATABASE = {
   'escritorios de advocacia': [
     { name: 'Escritório Almeida & Associados', domain: 'almeidaadvogados.com.br', city: 'Rio de Janeiro', state: 'RJ', desc: 'Direito Empresarial', category: 'advocacia' },
@@ -49,6 +91,21 @@ const LOCAL_DATABASE = {
     { name: 'Inova Consultoria Asa Sul', domain: 'inovaconsultoria.com.br', city: 'Brasília', state: 'DF', desc: 'Consultoria tecnologia', category: 'consultoria' },
     { name: 'W2B Consultoria Digital', domain: 'w2bconsultoria.com.br', city: 'Brasília', state: 'DF', desc: 'Consultoria marketing digital', category: 'consultoria' },
   ],
+  'contabilidade': [
+    { name: 'Contabilidade Machado & Associados', domain: 'machadoassessoria.com.br', city: 'Rio de Janeiro', state: 'RJ', desc: 'Escritório contábil', category: 'contabilidade' },
+    { name: 'Alpha Contabilidade RJ', domain: 'alphacontabilrj.com.br', city: 'Rio de Janeiro', state: 'RJ', desc: 'Assessoria contábil', category: 'contabilidade' },
+    { name: 'Borges & Lima Contadores', domain: 'borgeslima.com.br', city: 'Rio de Janeiro', state: 'RJ', desc: 'Empresa contábil', category: 'contabilidade' },
+    { name: 'Silva & Castro Contabilidade', domain: 'silvacastrocontabil.com.br', city: 'Rio de Janeiro', state: 'RJ', desc: 'Contabilidade geral', category: 'contabilidade' },
+    { name: 'Oliveira Contabilidade Digital', domain: 'oliveiracontabil.com.br', city: 'Rio de Janeiro', state: 'RJ', desc: 'Consultoria contábil', category: 'contabilidade' },
+    { name: 'Ferreira & Campos Assessoria', domain: 'ferreiracampos.com.br', city: 'Rio de Janeiro', state: 'RJ', desc: 'Assessoria contábil', category: 'contabilidade' },
+    { name: 'Santos & Pereira Contabilidade', domain: 'santoscontabil.com.br', city: 'Rio de Janeiro', state: 'RJ', desc: 'Escritório contábil', category: 'contabilidade' },
+    { name: 'Costa Contabilidade Empresarial', domain: 'costacontabil.com.br', city: 'Rio de Janeiro', state: 'RJ', desc: 'Contabilidade empresarial', category: 'contabilidade' },
+    { name: 'Andrade Contabilidade Ltda', domain: 'andradecontabil.com.br', city: 'Rio de Janeiro', state: 'RJ', desc: 'Escritório contábil', category: 'contabilidade' },
+    { name: 'RJ Assessores Contábeis', domain: 'rjassessores.com.br', city: 'Rio de Janeiro', state: 'RJ', desc: 'Assessoria contábil', category: 'contabilidade' },
+    { name: 'Contabilidade São Paulo SP', domain: 'contabilsp.com.br', city: 'São Paulo', state: 'SP', desc: 'Escritório contábil', category: 'contabilidade' },
+    { name: 'MT Contabilidade', domain: 'mtcontabilidade.com.br', city: 'São Paulo', state: 'SP', desc: 'Assessoria contábil', category: 'contabilidade' },
+    { name: 'Expert Contábil', domain: 'expertcontabil.com.br', city: 'São Paulo', state: 'SP', desc: 'Consultoria contábil', category: 'contabilidade' },
+  ],
   'restaurantes': [
     { name: 'Restaurante Fasano', domain: 'fasano.com.br', city: 'São Paulo', state: 'SP', desc: 'Culinária italiana', category: 'restaurante' },
     { name: 'Outback Steakhouse', domain: 'outback.com.br', city: 'Rio de Janeiro', state: 'RJ', desc: 'Carnes e massas', category: 'restaurante' },
@@ -84,6 +141,7 @@ const NICHE_MAPPINGS = {
   'personal trainers': ['personal trainers', 'personal trainer', 'coach esportivo', 'treinador', 'fitness'],
   'academias': ['academias', 'academia', 'crossfit', 'ginástica', 'musculação'],
   'consultorias': ['consultorias', 'consultoria', 'consultor', 'assessoria'],
+  'contabilidade': ['contabilidade', 'contador', 'escritório contábil', 'assessoria contábil', 'empresa contábil', 'consultoria contábil'],
   'restaurantes': ['restaurantes', 'restaurante', 'gastronomia', 'comida'],
   'nutricionistas': ['nutricionistas', 'nutrição', 'nutricionista'],
   'clínicas médicas': ['clínicas médicas', 'clínica médica', 'hospital', 'clínica'],
@@ -102,6 +160,10 @@ const LOCATION_MAPPINGS = {
 };
 
 const DDD_MAP = { 'SP': '11', 'RJ': '21', 'MG': '31', 'PR': '41', 'RS': '51', 'PE': '81', 'DF': '61' };
+
+// ========================================
+// FUNÇÕES DE VALIDAÇÃO
+// ========================================
 
 // Check if lead matches niche
 function leadMatchesNiche(lead, selectedNiche) {
@@ -140,7 +202,6 @@ function leadMatchesLocation(lead, selectedLocation) {
   }
 
   // FIRST: Check if "DF" or "Distrito Federal" is in the location
-  // This handles "Brasília, DF" specifically
   const hasDF = location.includes('df') ||
     location.includes('distrito federal') ||
     location.includes('brasília') ||
@@ -189,8 +250,8 @@ function validateEmail(email) {
 // Validate website URL format
 function validateWebsite(website) {
   if (!website) return false;
-  const urlRegex = /^https?:\/\/.+\..+/i;
-  return urlRegex.test(website);
+  const urlPattern = /^https?:\/\/.+\..+/i;
+  return urlPattern.test(website);
 }
 
 // Extract domain from website URL
@@ -227,7 +288,7 @@ function calculateScore(lead) {
   else if (domain.includes('webflow')) score += 15;
   else if (domain.includes('weebly')) score += 20;
   else if (domain.includes('godaddy') || domain.includes('sitebuilder')) score += 35;
-  else if (!domain) score -= 30; // No website is a negative signal
+  else if (!domain) score -= 30;
 
   // Contact info
   if (lead.email && validateEmail(lead.email)) score += 10;
@@ -237,8 +298,9 @@ function calculateScore(lead) {
   if (lead.whatsapp) score += 10;
 
   // Source credibility
-  if (lead.source === 'Google Maps') score += 10;
-  if (lead.source === 'Local Database') score += 5; // Lower score for fallback data
+  if (lead.source === 'Google Places') score += 10;
+  if (lead.source === 'Bing Search') score += 8;
+  if (lead.source === 'Local Database') score += 5;
 
   // Quality signals from description
   if (lead.desc?.toLowerCase().includes('digital')) score += 5;
@@ -247,12 +309,126 @@ function calculateScore(lead) {
   return Math.min(85, Math.max(15, Math.round(score)));
 }
 
-// Get leads from local database with proper filtering
+// ========================================
+// BUSCA EM FONTES REAIS
+// ========================================
+
+// Search using Bing Search API
+async function searchWithBing(niche, location, quantity) {
+  if (!CONFIG.BING_SEARCH_API_KEY) {
+    console.log('[API] Bing API key não configurada');
+    return [];
+  }
+
+  console.log('[API] Busca com Bing API...');
+
+  try {
+    // Build search queries with variations
+    const queries = buildSearchQueries(niche, location);
+
+    const allResults = [];
+
+    for (const query of queries) {
+      console.log('[API] Executando query Bing:', query);
+
+      const url = new URL(CONFIG.BING_SEARCH_ENDPOINT);
+      url.searchParams.set('q', query);
+      url.searchParams.set('count', Math.min(quantity, 50));
+
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Ocp-Apim-Subscription-Key': CONFIG.BING_SEARCH_API_KEY,
+        },
+      });
+
+      if (!response.ok) {
+        console.error('[API] Erro Bing API:', response.status);
+        continue;
+      }
+
+      const data = await response.json();
+
+      if (data.webPages?.value) {
+        for (const item of data.webPages.value) {
+          const domain = extractDomain(item.url);
+          if (domain && !allResults.find(r => r.domain === domain)) {
+            allResults.push({
+              name: extractNameFromUrl(item.url),
+              website: item.url,
+              domain,
+              snippet: item.snippet || '',
+              source: 'Bing Search',
+            });
+          }
+        }
+      }
+    }
+
+    console.log('[API] Bing retornou', allResults.length, 'resultados');
+    return allResults.slice(0, quantity);
+  } catch (error) {
+    console.error('[API] Erro ao buscar com Bing:', error);
+    return [];
+  }
+}
+
+// Build search queries with variations
+function buildSearchQueries(niche, location) {
+  const state = location.split(',').pop()?.trim().toUpperCase() || '';
+  const city = location.split(',')[0]?.trim() || location;
+
+  // Niche variations
+  const nicheVariations = {
+    'contabilidade': ['contabilidade', 'contador', 'escritório contábil', 'assessoria contábil', 'empresa contábil', 'consultoria contábil'],
+    'consultorias': ['consultoria', 'assessoria empresarial', 'consultoria de negócios'],
+    'academias': ['academia', 'ginásio', 'crossfit', 'musculação'],
+    'advocacia': ['advogado', 'escritório de advocacia', 'advocacia'],
+    'default': [niche],
+  };
+
+  const variations = nicheVariations[niche.toLowerCase()] || nicheVariations['default'];
+
+  // Build queries
+  const queries = [];
+  for (const n of variations) {
+    queries.push(`${n} ${city} ${state}`);
+    queries.push(`${n} em ${city} ${state}`);
+  }
+
+  return [...new Set(queries)].slice(0, 6);
+}
+
+// Extract company name from URL
+function extractNameFromUrl(url) {
+  try {
+    const hostname = new URL(url).hostname;
+    const name = hostname.replace(/^www\./, '').replace(/\.(com|com\.br|org|org\.br|net|net\.br|br)$/i, '');
+    return name
+      .split('.')
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ')
+      .replace(/-/g, ' ')
+      .replace(/'/g, ' ');
+  } catch {
+    return 'Empresa';
+  }
+}
+
+// ========================================
+// LOCAL DATABASE (APENAS DEV)
+// ========================================
+
 function getLeadsFromLocalDatabase(niche, location, quantity) {
+  // Only use local database in development
+  if (CONFIG.isProduction && hasRealSource()) {
+    console.log('[API] Produção com fonte real configurada - não usa banco local');
+    return [];
+  }
+
   const normalizedNiche = niche?.toLowerCase().trim() || '';
   const normalizedLocation = location?.toLowerCase().trim() || '';
 
-  console.log('[API] Buscando leads para nicho:', normalizedNiche, 'em', normalizedLocation);
+  console.log('[API] Buscando no banco local para nicho:', normalizedNiche, 'em', normalizedLocation);
 
   // Find matching niche key
   let matchingNicheKey = null;
@@ -262,7 +438,6 @@ function getLeadsFromLocalDatabase(niche, location, quantity) {
       matchingNicheKey = key;
       break;
     }
-    // Also check direct match
     if (normalizedNiche.includes(key) || key.includes(normalizedNiche)) {
       matchingNicheKey = key;
       break;
@@ -276,22 +451,21 @@ function getLeadsFromLocalDatabase(niche, location, quantity) {
 
   console.log('[API] Nicho mapeado para:', matchingNicheKey);
 
-  // Get candidates from this niche ONLY - no fallback to other niches
   let candidates = [...LOCAL_DATABASE[matchingNicheKey]];
 
   console.log('[API] Candidatos do nicho', matchingNicheKey, ':', candidates.length);
 
-  // Filter by location FIRST
+  // Filter by location
   const locationFiltered = candidates.filter(c => leadMatchesLocation(c, normalizedLocation));
 
   console.log('[API] Candidatos após filtro de localização:', locationFiltered.length);
 
   if (locationFiltered.length === 0) {
     console.log('[API] Nenhum lead encontrado para esta localização no nicho');
-    return []; // NO FALLBACK - return empty instead of returning wrong niche leads
+    return [];
   }
 
-  // Generate leads with structured data
+  // Generate leads
   return locationFiltered.slice(0, quantity).map((c, idx) => {
     const ddd = DDD_MAP[c.state] || '11';
     const phone1 = `(${ddd}) 9${Math.floor(4000 + Math.random() * 5999)}-${Math.floor(1000 + Math.random() * 8999)}`;
@@ -343,7 +517,10 @@ function getLeadsFromLocalDatabase(niche, location, quantity) {
   });
 }
 
-// Check if lead is already captured
+// ========================================
+// VERIFICAÇÃO DE DUPLICADOS
+// ========================================
+
 async function checkLeadCaptured(lead) {
   if (!supabase) return false;
 
@@ -378,7 +555,6 @@ async function checkLeadCaptured(lead) {
   }
 }
 
-// Filter leads that are already captured
 async function filterAlreadyCapturedLeads(leads) {
   if (!supabase) return { filtered: leads, capturedCount: 0 };
 
@@ -389,7 +565,7 @@ async function filterAlreadyCapturedLeads(leads) {
     const isCaptured = await checkLeadCaptured(lead);
     if (isCaptured) {
       capturedCount++;
-      console.log('[API] Lead já capturado, ignorando:', lead.name, '-', lead.website);
+      console.log('[API] Lead já capturado, ignorando:', lead.name);
     } else {
       uncaptured.push(lead);
     }
@@ -398,8 +574,13 @@ async function filterAlreadyCapturedLeads(leads) {
   return { filtered: uncaptured, capturedCount };
 }
 
-// Health check endpoint
+// ========================================
+// ENDPOINT HEALTH CHECK
+// ========================================
+
 export async function GET() {
+  const sources = getConfiguredSources();
+
   return Response.json({
     ok: true,
     route: '/api/leads/capture',
@@ -407,12 +588,19 @@ export async function GET() {
     timestamp: new Date().toISOString(),
     services: {
       supabase: Boolean(supabase),
-      localDatabase: true,
+      localDatabase: !CONFIG.isProduction || !hasRealSource(),
+      realSourcesConfigured: sources,
+      googlePlacesConfigured: Boolean(CONFIG.GOOGLE_PLACES_API_KEY),
+      serpapiConfigured: Boolean(CONFIG.SERPAPI_API_KEY),
+      bingSearchConfigured: Boolean(CONFIG.BING_SEARCH_API_KEY),
     },
   });
 }
 
-// Main POST handler
+// ========================================
+// MAIN POST HANDLER
+// ========================================
+
 export async function POST(req) {
   const startTime = Date.now();
 
@@ -439,10 +627,10 @@ export async function POST(req) {
       quantity = 20,
       captureMetric = 'website_reformulation',
       contactRequirements = { email: true },
-      sources = ['local_database'],
     } = body;
 
     const requestedQuantity = Math.max(1, Math.min(Number(quantity), 100));
+    const sources = getConfiguredSources();
 
     console.log('[API] ========================================');
     console.log('[API] LEAD CAPTURE REQUEST');
@@ -451,6 +639,11 @@ export async function POST(req) {
     console.log('[API] Localização:', location);
     console.log('[API] Quantidade:', requestedQuantity);
     console.log('[API] Requisitos:', JSON.stringify(contactRequirements));
+    console.log('[API] Produção:', CONFIG.isProduction);
+    console.log('[API] Fontes configuradas:', sources.length > 0 ? sources : 'NENHUMA');
+    console.log('[API] Google Places:', CONFIG.GOOGLE_PLACES_API_KEY ? 'SIM' : 'NÃO');
+    console.log('[API] SerpAPI:', CONFIG.SERPAPI_API_KEY ? 'SIM' : 'NÃO');
+    console.log('[API] Bing Search:', CONFIG.BING_SEARCH_API_KEY ? 'SIM' : 'NÃO');
     console.log('[API] ========================================');
 
     const stats = {
@@ -465,36 +658,177 @@ export async function POST(req) {
       locationMismatch: 0,
       rejectionReasons: {},
       errors: [],
-      source: 'local_database',
+      sourcesAttempted: [],
     };
 
-    // Get leads from local database with strict filtering
-    let rawLeads = getLeadsFromLocalDatabase(niche, location, requestedQuantity * 2);
+    let rawLeads = [];
+    let sourceUsed = 'none';
+
+    // ========================================
+    // TENTAR FONTES REAIS PRIMEIRO
+    // ========================================
+
+    if (sources.length > 0) {
+      console.log('[API] Tentando fontes reais...');
+
+      // Try Bing Search first if configured
+      if (CONFIG.BING_SEARCH_API_KEY && sourceUsed === 'none') {
+        stats.sourcesAttempted.push('bing_search');
+        const bingResults = await searchWithBing(niche, location, requestedQuantity * 3);
+        if (bingResults.length > 0) {
+          rawLeads = bingResults;
+          sourceUsed = 'bing_search';
+          console.log('[API] Bing retornou', bingResults.length, 'resultados');
+        }
+      }
+
+      // TODO: Implementar Google Places e SerpAPI quando configurados
+    }
+
+    // ========================================
+    // FALLBACK PARA BANCO LOCAL (SÓ DEV)
+    // ========================================
+
+    if (rawLeads.length === 0) {
+      console.log('[API] Nenhuma fonte real retornou resultados');
+
+      if (CONFIG.isProduction && sources.length > 0) {
+        // Produção com fonte configurada mas sem resultados
+        console.log('[API] PRODUTO: Fontes configuradas mas sem resultados');
+
+        return Response.json({
+          success: false,
+          errorCode: 'NO_CANDIDATES_FOUND',
+          message: `Nenhum candidato foi encontrado para ${niche} em ${location}. As fontes estão configuradas mas não retornaram resultados. Tente ampliar a localização ou ajustar o nicho.`,
+          requested: requestedQuantity,
+          qualified: [],
+          qualifiedCount: 0,
+          totalFound: 0,
+          totalScanned: 0,
+          partial: false,
+          stats,
+          details: {
+            sourcesConfigured: sources,
+            sourcesAttempted: stats.sourcesAttempted,
+            suggestions: [
+              'Amplie a localização para região ou Brasil',
+              'Verifique se o nicho está correto',
+              'Tente sinônimos do nicho',
+            ],
+          },
+        }, { status: 200 });
+      }
+
+      // Dev ou sem fontes configuradas - usar banco local
+      console.log('[API] Buscando no banco local...');
+      rawLeads = getLeadsFromLocalDatabase(niche, location, requestedQuantity * 2);
+
+      if (rawLeads.length > 0) {
+        sourceUsed = 'local_database';
+        console.log('[API] Banco local retornou', rawLeads.length, 'resultados');
+      }
+    }
+
+    // ========================================
+    // SE NENHUM CANDIDATO ENCONTRADO
+    // ========================================
+
+    if (rawLeads.length === 0) {
+      console.log('[API] NENHUM CANDIDATO ENCONTRADO');
+
+      if (CONFIG.isProduction && !hasRealSource()) {
+        // Produção sem fonte configurada
+        return Response.json({
+          success: false,
+          errorCode: 'CAPTURE_SOURCE_NOT_CONFIGURED',
+          message: 'Nenhuma fonte real de captura configurada. Para capturar leads reais em produção, configure pelo menos uma das seguintes APIs: Google Places, SerpAPI ou Bing Search.',
+          requested: requestedQuantity,
+          qualified: [],
+          qualifiedCount: 0,
+          totalFound: 0,
+          totalScanned: 0,
+          partial: false,
+          stats,
+          details: {
+            missing: [
+              !CONFIG.GOOGLE_PLACES_API_KEY ? 'GOOGLE_PLACES_API_KEY' : null,
+              !CONFIG.SERPAPI_API_KEY ? 'SERPAPI_API_KEY' : null,
+              !CONFIG.BING_SEARCH_API_KEY ? 'BING_SEARCH_API_KEY' : null,
+            ].filter(Boolean),
+            productionMode: true,
+            setupInstructions: 'Adicione as variáveis de ambiente no painel da Vercel para ativar a captura real de leads.',
+          },
+        }, { status: 200 });
+      }
+
+      if (!CONFIG.isProduction) {
+        // Dev - retorna erro com instruções
+        return Response.json({
+          success: false,
+          errorCode: 'NO_LEADS_FOUND',
+          message: `Não foram encontrados leads para "${niche}" em "${location}" no banco de dados de demonstração. Esse nicho pode não estar implementado ainda.`,
+          requested: requestedQuantity,
+          qualified: [],
+          qualifiedCount: 0,
+          totalFound: 0,
+          totalScanned: 0,
+          partial: false,
+          stats,
+          details: {
+            availableNiches: Object.keys(LOCAL_DATABASE),
+            requestedNiche: niche,
+            suggestions: [
+              'Verifique a ortografia do nicho',
+              'Use um dos nichos disponíveis',
+              'Em produção, configure uma fonte real',
+            ],
+          },
+        }, { status: 200 });
+      }
+
+      // Fallback final
+      return Response.json({
+        success: false,
+        errorCode: 'NO_LEADS_FOUND',
+        message: `Nenhum lead encontrado para ${niche} em ${location}.`,
+        requested: requestedQuantity,
+        qualified: [],
+        qualifiedCount: 0,
+        totalFound: 0,
+        totalScanned: 0,
+        partial: false,
+        stats,
+      }, { status: 200 });
+    }
+
+    // ========================================
+    // PROCESSAR CANDIDATOS
+    // ========================================
 
     stats.candidatesFound = rawLeads.length;
     stats.candidatesScanned = rawLeads.length;
-    stats.source = 'local_database';
+    stats.source = sourceUsed;
 
     console.log('[API] Leads encontrados antes dos filtros:', rawLeads.length);
 
-    // CRITICAL: Apply niche matching filter
+    // Apply niche matching filter
     const nicheMatchingLeads = rawLeads.filter(lead => {
       const matches = leadMatchesNiche(lead, niche);
       if (!matches) {
         stats.nicheMismatch++;
-        console.log('[API] Lead rejeitado por nicho:', lead.name, '- Nicho esperado:', niche);
+        console.log('[API] Lead rejeitado por nicho:', lead.name);
       }
       return matches;
     });
 
     console.log('[API] Leads após filtro de nicho:', nicheMatchingLeads.length);
 
-    // CRITICAL: Apply location matching filter
+    // Apply location matching filter
     const locationMatchingLeads = nicheMatchingLeads.filter(lead => {
       const matches = leadMatchesLocation(lead, location);
       if (!matches) {
         stats.locationMismatch++;
-        console.log('[API] Lead rejeitado por localização:', lead.name, '- Local:', lead.city, lead.state);
+        console.log('[API] Lead rejeitado por localização:', lead.name, '-', lead.city, lead.state);
       }
       return matches;
     });
@@ -503,7 +837,7 @@ export async function POST(req) {
 
     rawLeads = locationMatchingLeads;
 
-    // Filter out leads that are already captured
+    // Filter out already captured leads
     if (supabase && rawLeads.length > 0) {
       console.log('[API] Verificando leads já capturados...');
       const { filtered, capturedCount } = await filterAlreadyCapturedLeads(rawLeads);
@@ -512,7 +846,10 @@ export async function POST(req) {
       console.log('[API] Leads após filtro de duplicados:', rawLeads.length);
     }
 
-    // Apply contact requirements
+    // ========================================
+    // APLICAR REQUISITOS DE CONTATO
+    // ========================================
+
     const emailRequired = contactRequirements?.email !== false;
     const websiteRequired = contactRequirements?.website === true;
 
@@ -550,26 +887,56 @@ export async function POST(req) {
     console.log('[API] Leads finais:', finalLeads.length);
     console.log('[API] Duração:', duration + 'ms');
 
-    // Log sample leads for debugging
+    // Log sample leads
     if (finalLeads.length > 0) {
       console.log('[API] Amostra de lead retornado:', {
         name: finalLeads[0].name,
         city: finalLeads[0].city,
         state: finalLeads[0].state,
         score: finalLeads[0].score,
-        category: finalLeads[0].category,
       });
     }
 
-    // Build response
-    const response = {
+    // ========================================
+    // RETORNAR RESULTADO
+    // ========================================
+
+    // CRITICAL: Nunca retornar success: true com 0 resultados
+    if (finalLeads.length === 0) {
+      console.log('[API] NENHUM LEAD QUALIFICADO - retornando erro');
+
+      return Response.json({
+        success: false,
+        errorCode: 'NO_LEADS_QUALIFIED',
+        message: `Nenhum lead atende aos requisitos solicitados (${emailRequired ? 'email, ' : ''}${websiteRequired ? 'website' : ''}) para ${niche} em ${location}. Tente desativar requisitos não essenciais.`,
+        requested: requestedQuantity,
+        qualified: [],
+        qualifiedCount: 0,
+        totalFound: stats.candidatesFound,
+        totalScanned: stats.candidatesScanned,
+        rejectedCount: stats.candidatesScanned,
+        partial: false,
+        stats,
+        details: {
+          rejectionReasons: stats.rejectionReasons,
+          suggestions: [
+            emailRequired ? 'Desative o requisito de email se não for essencial' : null,
+            websiteRequired ? 'Desative o requisito de website se não for essencial' : null,
+            'Amplie a quantidade de leads buscados',
+          ].filter(Boolean),
+        },
+      }, { status: 200 });
+    }
+
+    // Success com leads
+    return Response.json({
       success: true,
       captureRunId,
       requested: requestedQuantity,
       qualified: finalLeads,
       qualifiedCount: finalLeads.length,
-      totalFound: finalLeads.length,
-      totalScanned: rawLeads.length,
+      totalFound: stats.candidatesFound,
+      totalScanned: stats.candidatesScanned,
       rejectedCount: stats.candidatesScanned - finalLeads.length,
       rejectionReasons: stats.rejectionReasons,
       partial: finalLeads.length < requestedQuantity,
@@ -578,29 +945,9 @@ export async function POST(req) {
         : `Encontramos ${finalLeads.length} leads válidos de ${requestedQuantity} solicitados para ${niche} em ${location}.`,
       stats,
       duration,
-      isDevFallback: true,
-    };
-
-    // If no leads found, return helpful message
-    if (finalLeads.length === 0) {
-      return Response.json({
-        success: false,
-        errorCode: 'NO_LEADS_FOUND',
-        message: `Não foram encontrados leads para ${niche} em ${location} com os requisitos atuais. Tente outra localização ou nicho.`,
-        details: {
-          requestedNiche: niche,
-          requestedLocation: location,
-          suggestions: [
-            'Verifique a ortografia do nicho',
-            'Tente uma cidade ou estado diferente',
-            'Amplie a localização para região ou Brasil',
-          ],
-        },
-        ...response,
-      }, { status: 200 });
-    }
-
-    return Response.json(response);
+      source: sourceUsed,
+      isDevFallback: sourceUsed === 'local_database',
+    });
 
   } catch (error) {
     console.error('[API] ERRO FATAL:', error);

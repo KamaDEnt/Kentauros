@@ -426,14 +426,34 @@ const CaptureModal = ({ isOpen, onClose }) => {
 
       if (results.length > 0) {
         setTimeout(() => setStep(3), 500);
+      } else {
+        // No results but completed - this is an error case
+        console.warn('[CaptureModal] Captura concluída mas sem resultados');
+        addNotification(
+          t('capture.noResults'),
+          currentJob?.phaseLabel || 'Nenhum lead encontrado para os filtros selecionados.',
+          'warning'
+        );
       }
     }
     if (currentJob?.status === 'failed' && step === 2) {
       console.error('[CaptureModal] Captura falhou:', currentJob?.error);
-      setCaptureDebug(prev => ({ ...prev, lastError: currentJob?.error }));
-      addNotification(t('common.error'), currentJob?.error || 'A captura falhou. Revise os filtros ou tente novamente.', 'error');
+      console.error('[CaptureModal] Error code:', currentJob?.errorCode);
+      console.error('[CaptureModal] Phase label:', currentJob?.phaseLabel);
+
+      setCaptureDebug(prev => ({ ...prev, lastError: currentJob?.error || currentJob?.phaseLabel }));
+
+      // Show detailed error notification
+      const errorMessage = currentJob?.phaseLabel || currentJob?.error || 'A captura falhou.';
+      addNotification(t('common.error'), errorMessage, 'error');
+
+      // Show error in modal UI if no results
+      if (results.length === 0) {
+        // Keep user at step 2 but show error clearly
+        // The "Voltar" button should allow them to change filters
+      }
     }
-  }, [currentJob?.status, currentJob?.error, currentJob?.captureRunId, step, addNotification, t, results, captureRunId]);
+  }, [currentJob?.status, currentJob?.error, currentJob?.errorCode, currentJob?.phaseLabel, currentJob?.captureRunId, step, addNotification, t, results, captureRunId]);
 
   useEffect(() => {
     if (resultsPage !== paginatedResults.currentPage) {
