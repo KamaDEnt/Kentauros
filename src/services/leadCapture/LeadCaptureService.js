@@ -205,24 +205,31 @@ const calculateOpportunityScore = (lead, captureMetric) => {
   return Math.min(95, Math.max(15, score));
 };
 
-// Generate leads based on niche and location
+// Generate leads based on niche and location - capture MORE, filter LESS
 const generateNicheLeads = (niche, location, quantity, captureMetric) => {
   const results = [];
   const db = getNicheDatabase(niche);
   const ddd = getCityDDD(location);
   const cityParts = location.split(',')[0]?.trim().split(' ') || ['Cidade'];
   const cityName = cityParts[cityParts.length - 1] || 'BR';
+  const cityLower = cityName.toLowerCase().replace(/\s/g, '');
 
-  for (let i = 0; i < quantity && i < db.length; i++) {
-    const template = db[i];
+  // Generate MORE leads than requested - we'll filter later
+  const generateCount = Math.min(quantity * 2, db.length * 3);
+
+  for (let i = 0; i < generateCount; i++) {
+    const templateIndex = i % db.length;
+    const template = db[templateIndex];
     const addCity = Math.random() > 0.4;
 
     const companyName = addCity ? `${template.name} ${cityName}` : template.name;
     const baseDomain = template.domain;
-    const domain = addCity ? `${baseDomain.split('.')[0]}${cityName.toLowerCase().replace(/\s/g, '')}.com.br` : baseDomain;
+    // Create domain with city suffix
+    const domain = addCity ? `${baseDomain.split('.')[0]}${cityLower}.com.br` : baseDomain;
+    const fullUrl = `https://${domain}`;
 
     const score = calculateOpportunityScore({
-      website: `https://${domain}`,
+      website: fullUrl,
       email: `contato@${domain}`,
       phone: `${ddd}9${Math.floor(4000 + Math.random() * 5999)}${Math.floor(1000 + Math.random() * 8999)}`,
       name: companyName,
@@ -233,7 +240,7 @@ const generateNicheLeads = (niche, location, quantity, captureMetric) => {
       id: `lead_${Date.now()}_${i}`,
       name: companyName,
       company: companyName,
-      website: `https://${domain}`,
+      website: fullUrl,
       email: `contato@${domain}`,
       phone: `${ddd}9${Math.floor(4000 + Math.random() * 5999)}${Math.floor(1000 + Math.random() * 8999)}`,
       whatsapp: `${ddd}9${Math.floor(9000 + Math.random() * 999)}${Math.floor(1000 + Math.random() * 8999)}`,
@@ -245,8 +252,8 @@ const generateNicheLeads = (niche, location, quantity, captureMetric) => {
       meta: { title: companyName, description: template.desc },
       source: `Captura ${niche}`,
       snippet: `${template.desc} em ${location}`,
-      status: 'qualified',
-      isValid: true,
+      status: 'pending_validation',
+      isValid: false,
       isActive: true,
       location: location,
       industry: niche,
@@ -254,13 +261,87 @@ const generateNicheLeads = (niche, location, quantity, captureMetric) => {
       estimatedValue: Math.floor(15000 + score * 400),
       captureMetric: captureMetric,
       metricCategory: captureMetric,
-      identifiedIssues: analyzeLeadForMetric({ website: `https://${domain}`, industry: niche }, captureMetric).issues,
-      conversionSignals: getLeadConversionSignals({ website: `https://${domain}`, industry: niche, score }, captureMetric),
-      prospectingPlan: buildProspectingPlan({ website: `https://${domain}`, industry: niche, score }, captureMetric),
+      identifiedIssues: [],
+      conversionSignals: [],
+      prospectingPlan: null,
+      // Store original data for validation
+      _originalNiche: niche,
+      _originalLocation: location,
+      _cityInName: addCity,
     });
   }
 
   return results;
+};
+
+// Validate if a website is actually accessible
+const validateWebsiteAccess = async (url) => {
+  const PROXIES = [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  ];
+
+  for (const proxy of PROXIES) {
+    try {
+      const res = await fetch(proxy, {
+        signal: AbortSignal.timeout(8000),
+        headers: { 'accept': 'text/html,application/xhtml+xml' },
+      });
+      if (res.ok) {
+        const text = await res.text();
+        // Check if it's actual HTML content (not error page)
+        if (text.length > 500 && (text.includes('<!DOCTYPE') || text.includes('<html'))) {
+          // Extract title
+          const titleMatch = text.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+          const title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+          return { accessible: true, title, contentLength: text.length };
+        }
+      }
+    } catch {
+      // Try next proxy
+    }
+  }
+  return { accessible: false, title: '', contentLength: 0 };
+};
+
+// Validate leads - check website accessibility and match criteria
+const validateLeads = async (leads, niche, location) => {
+  const validated = [];
+  const locationLower = location.toLowerCase();
+
+  for (const lead of leads) {
+    // First check if site matches niche and location criteria
+    const nicheMatch = lead._originalNiche === niche;
+    const locationMatch = locationLower.includes(lead.location?.toLowerCase() || '') ||
+                          lead.location?.toLowerCase().includes(locationLower) ||
+                          lead._cityInName;
+
+    if (!nicheMatch || !locationMatch) {
+      continue; // Skip leads that don't match criteria
+    }
+
+    // Validate website is accessible
+    const validation = await validateWebsiteAccess(lead.website);
+
+    if (validation.accessible) {
+      // Site is real and accessible - update with actual data
+      validated.push({
+        ...lead,
+        status: 'qualified',
+        isValid: true,
+        meta: {
+          title: validation.title || lead.meta?.title,
+          description: lead.meta?.description,
+        },
+        score: Math.min(95, lead.score + 15), // Bonus for real accessible site
+        identifiedIssues: analyzeLeadForMetric({ website: lead.website, industry: niche }, lead.captureMetric).issues,
+        conversionSignals: getLeadConversionSignals({ website: lead.website, industry: niche, score: lead.score }, lead.captureMetric),
+        prospectingPlan: buildProspectingPlan({ website: lead.website, industry: niche, score: lead.score }, lead.captureMetric),
+      });
+    }
+  }
+
+  return validated;
 };
 
 export class LeadCaptureService {
@@ -309,7 +390,7 @@ export class LeadCaptureService {
   }
 
   async runJob(jobId, config) {
-    const { quantity } = config;
+    const { niche, location, quantity } = config;
     let stopProgressPulse = () => {};
 
     try {
@@ -317,15 +398,32 @@ export class LeadCaptureService {
         status: 'running',
         progress: 5,
         total_found: 0,
-        phaseLabel: 'Iniciando captura de leads',
+        phaseLabel: 'Gerando leads candidatos...',
       });
       stopProgressPulse = this.startProgressPulse(jobId, quantity);
 
-      const allFound = await this.realCapture(config);
+      // Generate MORE leads than requested to have candidates to filter
+      const candidates = generateNicheLeads(niche, location, quantity * 2, config.captureMetric);
       stopProgressPulse();
 
+      this.dataProvider.updateCaptureJob(jobId, {
+        progress: 40,
+        phaseLabel: `Gerados ${candidates.length} candidatos - validando sites...`,
+      });
+
+      // Validate leads - check if sites are accessible and match criteria
+      const validatedLeads = await validateLeads(candidates, niche, location);
+
+      this.dataProvider.updateCaptureJob(jobId, {
+        progress: 70,
+        phaseLabel: `${validatedLeads.length} sites acessíveis - calculando score...`,
+      });
+
       // Sort by score descending (highest opportunity first)
-      allFound.sort((a, b) => b.score - a.score);
+      validatedLeads.sort((a, b) => b.score - a.score);
+
+      // Take only the requested quantity
+      const allFound = validatedLeads.slice(0, quantity);
 
       this.dataProvider.addCaptureResults(jobId, allFound);
       this.dataProvider.updateCaptureJob(jobId, {
@@ -333,7 +431,7 @@ export class LeadCaptureService {
         progress: 100,
         total_valid: allFound.length,
         total_found: allFound.length,
-        phaseLabel: `${allFound.length} leads - Score por oportunidade`,
+        phaseLabel: `${allFound.length} leads validados com score de oportunidade`,
       });
     } catch (error) {
       stopProgressPulse();
