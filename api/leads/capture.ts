@@ -419,11 +419,15 @@ function extractNameFromUrl(url) {
 // ========================================
 
 function getLeadsFromLocalDatabase(niche, location, quantity) {
-  // Only use local database in development
+  // Always use local database as fallback when no real source is configured
+  // Only skip if we have a real source and are in production
   if (CONFIG.isProduction && hasRealSource()) {
-    console.log('[API] Produção com fonte real configurada - não usa banco local');
-    return [];
+    console.log('[API] Produção com fonte real configurada - usando fonte real, não banco local');
+    return []; // Let the real source handle it
   }
+
+  console.log('[API] Usando banco local como fallback');
+  console.log('[API] Produção:', CONFIG.isProduction, '| Fonte real:', hasRealSource());
 
   const normalizedNiche = niche?.toLowerCase().trim() || '';
   const normalizedLocation = location?.toLowerCase().trim() || '';
@@ -686,20 +690,55 @@ export async function POST(req) {
     }
 
     // ========================================
-    // FALLBACK PARA BANCO LOCAL (SÓ DEV)
+    // FALLBACK PARA BANCO LOCAL
     // ========================================
 
     if (rawLeads.length === 0) {
-      console.log('[API] Nenhuma fonte real retornou resultados');
+      console.log('[API] Nenhuma fonte real retornou resultados, tentando banco local...');
 
-      if (CONFIG.isProduction && sources.length > 0) {
-        // Produção com fonte configurada mas sem resultados
-        console.log('[API] PRODUTO: Fontes configuradas mas sem resultados');
+      // Try local database
+      const localResults = getLeadsFromLocalDatabase(niche, location, requestedQuantity * 2);
 
+      if (localResults.length > 0) {
+        rawLeads = localResults;
+        sourceUsed = 'local_database';
+        console.log('[API] Banco local retornou', localResults.length, 'resultados');
+      } else {
+        // No local database results either
+        console.log('[API] Banco local não retornou resultados');
+
+        // Check if this is a valid niche that exists but has no location data
+        const nicheExists = Object.keys(LOCAL_DATABASE).some(key => {
+          const keywords = NICHE_MAPPINGS[key] || [key];
+          return keywords.some(kw => niche.toLowerCase().includes(kw) || kw.includes(niche.toLowerCase()));
+        });
+
+        if (nicheExists) {
+          // Niche exists but no location data
+          return Response.json({
+            success: false,
+            errorCode: 'NO_LEADS_FOR_LOCATION',
+            message: `O nicho "${niche}" existe, mas não há dados para ${location}. Por enquanto, o sistema de demonstração suporta: RJ, SP, MG, PR, RS, PE, DF. Para mais localizações, configure uma fonte real.`,
+            requested: requestedQuantity,
+            qualified: [],
+            qualifiedCount: 0,
+            totalFound: 0,
+            totalScanned: 0,
+            partial: false,
+            stats,
+            details: {
+              supportedLocations: ['Rio de Janeiro, RJ', 'São Paulo, SP', 'Belo Horizonte, MG', 'Brasília, DF', 'Curitiba, PR', 'Porto Alegre, RS', 'Recife, PE'],
+              availableNiches: Object.keys(LOCAL_DATABASE),
+              suggestion: 'Use uma das localizações suportadas ou configure uma API real (Google Places, Bing, SerpAPI) para busca ilimitada.',
+            },
+          }, { status: 200 });
+        }
+
+        // Niche doesn't exist at all
         return Response.json({
           success: false,
-          errorCode: 'NO_CANDIDATES_FOUND',
-          message: `Nenhum candidato foi encontrado para ${niche} em ${location}. As fontes estão configuradas mas não retornaram resultados. Tente ampliar a localização ou ajustar o nicho.`,
+          errorCode: 'NO_LEADS_FOUND',
+          message: `Não foram encontrados leads para "${niche}" em "${location}". O nicho "${niche}" não está no banco de demonstração.`,
           requested: requestedQuantity,
           qualified: [],
           qualifiedCount: 0,
@@ -708,24 +747,15 @@ export async function POST(req) {
           partial: false,
           stats,
           details: {
-            sourcesConfigured: sources,
-            sourcesAttempted: stats.sourcesAttempted,
+            availableNiches: Object.keys(LOCAL_DATABASE),
+            requestedNiche: niche,
             suggestions: [
-              'Amplie a localização para região ou Brasil',
-              'Verifique se o nicho está correto',
-              'Tente sinônimos do nicho',
+              'Verifique a ortografia do nicho',
+              'Use um dos nichos disponíveis',
+              'Em produção, configure uma fonte real',
             ],
           },
         }, { status: 200 });
-      }
-
-      // Dev ou sem fontes configuradas - usar banco local
-      console.log('[API] Buscando no banco local...');
-      rawLeads = getLeadsFromLocalDatabase(niche, location, requestedQuantity * 2);
-
-      if (rawLeads.length > 0) {
-        sourceUsed = 'local_database';
-        console.log('[API] Banco local retornou', rawLeads.length, 'resultados');
       }
     }
 
