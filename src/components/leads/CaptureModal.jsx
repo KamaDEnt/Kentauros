@@ -5,17 +5,17 @@ import { useApp } from '../../context/AppContext';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
-import Select from '../ui/Select';
 import Badge from '../ui/Badge';
-import { 
-  Zap, 
-  Search, 
-  MapPin, 
-  Target, 
-  CheckCircle2, 
-  Mail, 
-  Phone, 
-  Building2, 
+import { CustomDropdown } from '../ui/CustomDropdown';
+import {
+  Zap,
+  Search,
+  MapPin,
+  Target,
+  CheckCircle2,
+  Mail,
+  Phone,
+  Building2,
   Globe,
   Loader2,
   Trophy,
@@ -28,7 +28,35 @@ import {
   Palette,
   Wrench,
   LayoutTemplate,
-  ShieldCheck
+  ShieldCheck,
+  Gavel,
+  Dumbbell,
+  Stethoscope,
+  Calculator,
+  Home,
+  UtensilsCrossed,
+  ShoppingBag,
+  Code,
+  Megaphone,
+  Hammer,
+  Heart,
+  Scissors,
+  Car,
+  Shirt,
+  Lightbulb,
+  Users2,
+  GraduationCap,
+  PawPrint,
+  Hotel,
+  Camera,
+  Shield,
+  Sun,
+  Truck,
+  Factory,
+  Pill,
+  Armchair,
+  UserCheck,
+  Bird,
 } from 'lucide-react';
 import { LeadCaptureService } from '../../services/leadCapture/LeadCaptureService';
 import { emailService } from '../../services/leadCapture/EmailService';
@@ -63,29 +91,154 @@ Faz sentido eu enviar esse diagnóstico para vocês ou marcarmos uma conversa r�
 
 const improvedDefaultEmailSubject = `[Nome do lead capturado]: oportunidade rápida no site`;
 
-const NICHE_SUGGESTIONS = [
-  "Escritórios de Advocacia",
-  "Academias",
-  "Clínicas Médicas",
-  "Contabilidade",
-  "Imobiliárias",
-  "Restaurantes",
-  "E-commerce",
-  "Tecnologia",
-  "Agências de Marketing",
-  "Engenharia e Construção"
+// Nichos expandidos com ícones
+const NICHE_OPTIONS = [
+  // Serviços Profissionais
+  { value: 'escritórios de advocacia', label: 'Escritórios de Advocacia', icon: <Gavel size={16} />, category: 'Serviços Profissionais', searchTerms: ['advocacia', 'advogado', 'jurídico', 'direito'] },
+  { value: 'contabilidade', label: 'Contabilidade', icon: <Calculator size={16} />, category: 'Serviços Profissionais', searchTerms: ['contábil', 'contador', 'fiscal'] },
+  { value: 'consultorias', label: 'Consultorias', icon: <Lightbulb size={16} />, category: 'Serviços Profissionais', searchTerms: ['consultoria', 'consultor', 'assessoria'] },
+  { value: 'engenharias', label: 'Engenharias e Arquitetura', icon: <Hammer size={16} />, category: 'Serviços Profissionais', searchTerms: ['engenharia', 'arquitetura', 'projeto'] },
+
+  // Saúde e Bem-estar
+  { value: 'clínicas médicas', label: 'Clínicas Médicas', icon: <Stethoscope size={16} />, category: 'Saúde', searchTerms: ['clínica', 'médico', 'saúde'] },
+  { value: 'dentistas', label: 'Dentistas', icon: <Stethoscope size={16} />, category: 'Saúde', searchTerms: ['dentista', 'odontologia', 'dental'] },
+  { value: 'psicólogos', label: 'Psicólogos', icon: <Heart size={16} />, category: 'Saúde', searchTerms: ['psicólogo', 'psicologia', 'terapia'] },
+  { value: 'clínicas veterinárias', label: 'Clínicas Veterinárias', icon: <PawPrint size={16} />, category: 'Saúde', searchTerms: ['veterinário', 'pet', 'animal'] },
+  { value: 'nutricionistas', label: 'Nutricionistas', icon: <Heart size={16} />, category: 'Saúde', searchTerms: ['nutrição', 'nutricionista', 'dieta'] },
+
+  // Fitness e Beleza
+  { value: 'academias', label: 'Academias', icon: <Dumbbell size={16} />, category: 'Fitness', searchTerms: ['academia', 'ginástica', 'musculação'] },
+  { value: 'crossfit', label: 'CrossFit', icon: <Dumbbell size={16} />, category: 'Fitness', searchTerms: ['crossfit', 'cross box', 'funcional'] },
+  { value: 'personal trainers', label: 'Personal Trainers', icon: <UserCheck size={16} />, category: 'Fitness', searchTerms: ['personal', 'treino', 'personal trainer'] },
+  { value: 'salões de beleza', label: 'Salões de Beleza', icon: <Scissors size={16} />, category: 'Beleza', searchTerms: ['salão', 'beleza', 'cabelo'] },
+  { value: 'barbearias', label: 'Barbearias', icon: <Scissors size={16} />, category: 'Beleza', searchTerms: ['barbearia', 'barbeiro', 'barba'] },
+  { value: 'estéticas', label: 'Clínicas Estéticas', icon: <Heart size={16} />, category: 'Beleza', searchTerms: ['estética', 'estético', 'beleza'] },
+
+  // Imóveis e Construção
+  { value: 'imobiliárias', label: 'Imobiliárias', icon: <Home size={16} />, category: 'Imóveis', searchTerms: ['imobiliária', 'imóvel', 'corretora'] },
+  { value: 'construtoras', label: 'Construtoras', icon: <Hammer size={16} />, category: 'Imóveis', searchTerms: ['construtora', 'construção', 'obra'] },
+  { value: 'móveis planejados', label: 'Móveis Planejados', icon: <Armchair size={16} />, category: 'Imóveis', searchTerms: ['móveis', 'planejado', 'marcenaria'] },
+  { value: 'marcenarias', label: 'Marcenarias', icon: <Hammer size={16} />, category: 'Imóveis', searchTerms: ['marcenaria', 'móvel', 'madeira'] },
+
+  // Alimentação
+  { value: 'restaurantes', label: 'Restaurantes', icon: <UtensilsCrossed size={16} />, category: 'Alimentação', searchTerms: ['restaurante', 'comida', 'gastronomia'] },
+  { value: 'hamburguerias', label: 'Hamburguerias', icon: <UtensilsCrossed size={16} />, category: 'Alimentação', searchTerms: ['hambúrguer', 'hamburgueria', 'burger'] },
+  { value: 'pizzarias', label: 'Pizzarias', icon: <UtensilsCrossed size={16} />, category: 'Alimentação', searchTerms: ['pizza', 'pizzaria', 'italiano'] },
+  { value: 'cafeterias', label: 'Cafeterias', icon: <UtensilsCrossed size={16} />, category: 'Alimentação', searchTerms: ['café', 'cafeteria', 'padaria'] },
+
+  // Varejo
+  { value: 'lojas de roupas', label: 'Lojas de Roupas', icon: <Shirt size={16} />, category: 'Varejo', searchTerms: ['roupa', 'moda', 'boutique'] },
+  { value: 'ecommerce', label: 'E-commerce', icon: <ShoppingBag size={16} />, category: 'Varejo', searchTerms: ['e-commerce', 'loja virtual', 'online'] },
+  { value: 'farmácias', label: 'Farmácias', icon: <Pill size={16} />, category: 'Varejo', searchTerms: ['farmácia', 'medicamento', 'drogaria'] },
+  { value: 'supermercados', label: 'Supermercados', icon: <ShoppingBag size={16} />, category: 'Varejo', searchTerms: ['supermercado', 'mercado', 'atacado'] },
+  { value: 'óticas', label: 'Óticas', icon: <ShoppingBag size={16} />, category: 'Varejo', searchTerms: ['ótica', 'óculos', 'lente'] },
+
+  // Automotivo
+  { value: 'oficinas mecânicas', label: 'Oficinas Mecânicas', icon: <Car size={16} />, category: 'Automotivo', searchTerms: ['oficina', 'mecânico', 'carro'] },
+  { value: 'auto elétricas', label: 'Auto Elétricas', icon: <Car size={16} />, category: 'Automotivo', searchTerms: ['elétrica', 'auto', 'bateria'] },
+  { value: 'concessionárias', label: 'Concessionárias', icon: <Car size={16} />, category: 'Automotivo', searchTerms: ['concessionária', 'veículo', 'carro'] },
+
+  // Tecnologia
+  { value: 'empresas de tecnologia', label: 'Empresas de Tecnologia', icon: <Code size={16} />, category: 'Tecnologia', searchTerms: ['tech', 'tecnologia', 'software'] },
+  { value: 'software house', label: 'Software House', icon: <Code size={16} />, category: 'Tecnologia', searchTerms: ['software', 'dev', 'desenvolvimento'] },
+
+  // Marketing e Comunicação
+  { value: 'agências de marketing', label: 'Agências de Marketing', icon: <Megaphone size={16} />, category: 'Marketing', searchTerms: ['marketing', 'agência', 'publicidade'] },
+
+  // Educação
+  { value: 'escolas', label: 'Escolas', icon: <GraduationCap size={16} />, category: 'Educação', searchTerms: ['escola', 'ensino', 'educação'] },
+  { value: 'cursos online', label: 'Cursos Online', icon: <GraduationCap size={16} />, category: 'Educação', searchTerms: ['curso', 'online', 'ead'] },
+  { value: 'infoprodutores', label: 'Infoprodutores', icon: <GraduationCap size={16} />, category: 'Educação', searchTerms: ['info', 'produtor', 'curso digital'] },
+
+  // Turismo e Eventos
+  { value: 'hotéis', label: 'Hotéis', icon: <Hotel size={16} />, category: 'Turismo', searchTerms: ['hotel', 'hospedagem', 'pousada'] },
+  { value: 'pousadas', label: 'Pousadas', icon: <Hotel size={16} />, category: 'Turismo', searchTerms: ['pousada', 'hospedagem', 'turismo'] },
+  { value: 'eventos', label: 'Eventos', icon: <Camera size={16} />, category: 'Turismo', searchTerms: ['evento', 'festa', 'casamento'] },
+
+  // Serviços Diversos
+  { value: 'segurança eletrônica', label: 'Segurança Eletrônica', icon: <Shield size={16} />, category: 'Serviços', searchTerms: ['segurança', 'câmera', 'alarme'] },
+  { value: 'energia solar', label: 'Energia Solar', icon: <Sun size={16} />, category: 'Serviços', searchTerms: ['solar', 'painel', 'fotovoltaico'] },
+  { value: 'financeiras', label: 'Financeiras', icon: <Calculator size={16} />, category: 'Serviços', searchTerms: ['financeira', 'crédito', 'empréstimo'] },
+  { value: 'seguradoras', label: 'Seguradoras', icon: <Shield size={16} />, category: 'Serviços', searchTerms: ['seguradora', 'seguro', 'seguro'] },
+  { value: 'transportadoras', label: 'Transportadoras', icon: <Truck size={16} />, category: 'Serviços', searchTerms: ['transporte', 'frete', 'logística'] },
+  { value: 'logística', label: 'Logística', icon: <Truck size={16} />, category: 'Serviços', searchTerms: ['logística', 'armazenamento', 'distribuição'] },
+  { value: 'distribuidoras', label: 'Distribuidoras', icon: <Factory size={16} />, category: 'Serviços', searchTerms: ['distribuidora', 'atacado', 'distribuição'] },
+  { value: 'indústrias', label: 'Indústrias', icon: <Factory size={16} />, category: 'Serviços', searchTerms: ['indústria', 'fábrica', 'manufactura'] },
+  { value: 'pet shops', label: 'Pet Shops', icon: <Bird size={16} />, category: 'Serviços', searchTerms: ['pet', 'animal', 'cachorro'] },
+  { value: 'turismo', label: 'Turismo', icon: <Hotel size={16} />, category: 'Turismo', searchTerms: ['turismo', 'viagem', 'pacote'] },
 ];
 
-const LOCATION_SUGGESTIONS = [
-  "São Paulo, SP",
-  "Rio de Janeiro, RJ",
-  "Belo Horizonte, MG",
-  "Curitiba, PR",
-  "Porto Alegre, RS",
-  "Brasília, DF",
-  "Salvador, BA",
-  "Fortaleza, CE",
-  "Brasil"
+// Localizações expandidas
+const LOCATION_OPTIONS = [
+  // Capitais
+  { value: 'São Paulo, SP', label: 'São Paulo, SP', icon: <MapPin size={14} />, category: 'Capitais', count: 'Alta' },
+  { value: 'Rio de Janeiro, RJ', label: 'Rio de Janeiro, RJ', icon: <MapPin size={14} />, category: 'Capitais', count: 'Alta' },
+  { value: 'Belo Horizonte, MG', label: 'Belo Horizonte, MG', icon: <MapPin size={14} />, category: 'Capitais', count: 'Alta' },
+  { value: 'Brasília, DF', label: 'Brasília, DF', icon: <MapPin size={14} />, category: 'Capitais', count: 'Alta' },
+  { value: 'Salvador, BA', label: 'Salvador, BA', icon: <MapPin size={14} />, category: 'Capitais', count: 'Média' },
+  { value: 'Curitiba, PR', label: 'Curitiba, PR', icon: <MapPin size={14} />, category: 'Capitais', count: 'Alta' },
+  { value: 'Porto Alegre, RS', label: 'Porto Alegre, RS', icon: <MapPin size={14} />, category: 'Capitais', count: 'Média' },
+  { value: 'Recife, PE', label: 'Recife, PE', icon: <MapPin size={14} />, category: 'Capitais', count: 'Média' },
+  { value: 'Fortaleza, CE', label: 'Fortaleza, CE', icon: <MapPin size={14} />, category: 'Capitais', count: 'Média' },
+  { value: 'Goiânia, GO', label: 'Goiânia, GO', icon: <MapPin size={14} />, category: 'Capitais', count: 'Média' },
+  { value: 'Manaus, AM', label: 'Manaus, AM', icon: <MapPin size={14} />, category: 'Capitais', count: 'Baixa' },
+  { value: 'Belém, PA', label: 'Belém, PA', icon: <MapPin size={14} />, category: 'Capitais', count: 'Baixa' },
+  { value: 'Florianópolis, SC', label: 'Florianópolis, SC', icon: <MapPin size={14} />, category: 'Capitais', count: 'Média' },
+
+  // Grandes Cidades - SP
+  { value: 'Campinas, SP', label: 'Campinas, SP', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Alta' },
+  { value: 'Santos, SP', label: 'Santos, SP', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Média' },
+  { value: 'Ribeirão Preto, SP', label: 'Ribeirão Preto, SP', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Alta' },
+  { value: 'São José dos Campos, SP', label: 'São José dos Campos, SP', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Alta' },
+  { value: 'Sorocaba, SP', label: 'Sorocaba, SP', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Média' },
+
+  // Grandes Cidades - SC
+  { value: 'Joinville, SC', label: 'Joinville, SC', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Alta' },
+  { value: 'Blumenau, SC', label: 'Blumenau, SC', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Média' },
+
+  // Grandes Cidades - PR
+  { value: 'Londrina, PR', label: 'Londrina, PR', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Média' },
+  { value: 'Maringá, PR', label: 'Maringá, PR', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Média' },
+
+  // Grandes Cidades - MG
+  { value: 'Uberlândia, MG', label: 'Uberlândia, MG', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Alta' },
+  { value: 'Juiz de Fora, MG', label: 'Juiz de Fora, MG', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Média' },
+  { value: 'Contagem, MG', label: 'Contagem, MG', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Média' },
+
+  // Grandes Cidades - RJ
+  { value: 'Niterói, RJ', label: 'Niterói, RJ', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Média' },
+  { value: 'São Gonçalo, RJ', label: 'São Gonçalo, RJ', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Média' },
+
+  // Grandes Cidades - BA
+  { value: 'Feira de Santana, BA', label: 'Feira de Santana, BA', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Média' },
+  { value: 'Vitória da Conquista, BA', label: 'Vitória da Conquista, BA', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Baixa' },
+
+  // Grandes Cidades - PE
+  { value: 'Jaboatão dos Guararapes, PE', label: 'Jaboatão dos Guararapes, PE', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Média' },
+  { value: 'Olinda, PE', label: 'Olinda, PE', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Baixa' },
+
+  // Grandes Cidades - CE
+  { value: 'Caucaia, CE', label: 'Caucaia, CE', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Baixa' },
+  { value: 'Juazeiro do Norte, CE', label: 'Juazeiro do Norte, CE', icon: <MapPin size={14} />, category: 'Grandes Cidades', count: 'Baixa' },
+
+  // Regiões
+  { value: 'Sudeste', label: 'Sudeste (SP, RJ, MG, ES)', icon: <MapPin size={14} />, category: 'Regiões', count: 'Muito Alta' },
+  { value: 'Sul', label: 'Sul (PR, SC, RS)', icon: <MapPin size={14} />, category: 'Regiões', count: 'Alta' },
+  { value: 'Nordeste', label: 'Nordeste (MA, PI, CE, RN, PB, PE, AL, SE, BA)', icon: <MapPin size={14} />, category: 'Regiões', count: 'Alta' },
+  { value: 'Centro-Oeste', label: 'Centro-Oeste (DF, GO, MT, MS)', icon: <MapPin size={14} />, category: 'Regiões', count: 'Média' },
+  { value: 'Norte', label: 'Norte (AM, PA, AC, RO, RR, AP, TO)', icon: <MapPin size={14} />, category: 'Regiões', count: 'Baixa' },
+
+  // Brasil
+  { value: 'Brasil', label: 'Brasil (Todo o território)', icon: <MapPin size={14} />, category: 'Nacional', count: 'Muito Alta' },
+];
+
+// Quantidade de leads
+const QUANTITY_OPTIONS = [
+  { value: 10, label: '10 Leads', description: 'Para teste rápido' },
+  { value: 20, label: '20 Leads', description: 'Recomendado para início' },
+  { value: 30, label: '30 Leads', description: 'Boa quantidade inicial' },
+  { value: 50, label: '50 Leads', description: 'Para prospecção ampla' },
+  { value: 100, label: '100 Leads', description: 'Campanha completa' },
 ];
 
 const METRIC_ICONS = {
@@ -99,25 +252,23 @@ const GMAIL_SEND_DELAY_MS = GMAIL_POLICY.minDelaySeconds * 1000;
 
 const CaptureModal = ({ isOpen, onClose }) => {
   const { t } = useI18n();
-  const { 
-    startCaptureJob, 
-    updateCaptureJob, 
-    addCaptureResults, 
-    captureJobs, 
-    captureResults, 
+  const {
+    startCaptureJob,
+    updateCaptureJob,
+    addCaptureResults,
+    captureJobs,
+    captureResults,
     leads,
     addLead,
     updateLead
   } = useData();
   const { user, addNotification } = useApp();
-  
+
   const [step, setStep] = useState(1);
   const [currentJobId, setCurrentJobId] = useState(null);
   const [selectedLeads, setSelectedLeads] = useState([]);
   const [resultsPage, setResultsPage] = useState(1);
-  const [showNicheSuggestions, setShowNicheSuggestions] = useState(false);
-  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
-  
+
   // Email state
   const [emailTemplate, setEmailTemplate] = useState({
     subject: improvedDefaultEmailSubject,
@@ -125,9 +276,9 @@ const CaptureModal = ({ isOpen, onClose }) => {
   });
   const [sendingProgress, setSendingProgress] = useState({ current: 0, total: 0, status: 'idle', nextIn: 0 });
   const [sendingLogs, setSendingLogs] = useState([]);
-  
+
   // Capture state
-const [captureConfig, setCaptureConfig] = useState({
+  const [captureConfig, setCaptureConfig] = useState({
     captureMetric: 'website_reformulation',
     niche: '',
     location: '',
@@ -149,8 +300,8 @@ const [captureConfig, setCaptureConfig] = useState({
     lastError: null,
   });
 
-  const currentJob = useMemo(() => 
-    captureJobs.find(j => j.id === currentJobId), 
+  const currentJob = useMemo(() =>
+    captureJobs.find(j => j.id === currentJobId),
     [captureJobs, currentJobId]
   );
 
@@ -162,7 +313,7 @@ const [captureConfig, setCaptureConfig] = useState({
     'Calculando score de qualidade'
   );
 
-  const results = useMemo(() => 
+  const results = useMemo(() =>
     captureResults.filter(r => r.job_id === currentJobId),
     [captureResults, currentJobId]
   );
@@ -177,6 +328,11 @@ const [captureConfig, setCaptureConfig] = useState({
     addCaptureResults
   }), [updateCaptureJob, addCaptureResults]);
 
+  // Find labels for selected values
+  const selectedNicheLabel = NICHE_OPTIONS.find(n => n.value === captureConfig.niche)?.label || '';
+  const selectedLocationLabel = LOCATION_OPTIONS.find(l => l.value === captureConfig.location)?.label || '';
+  const selectedQuantityLabel = QUANTITY_OPTIONS.find(q => q.value === captureConfig.quantity)?.label || '';
+
   const handleStartCapture = async () => {
     if (!captureConfig.niche || !captureConfig.location) {
       addNotification(
@@ -186,6 +342,8 @@ const [captureConfig, setCaptureConfig] = useState({
       );
       return;
     }
+
+    console.log('[CaptureModal] Iniciando captura com config:', captureConfig);
 
     const jobId = startCaptureJob(captureConfig);
     setCurrentJobId(jobId);
@@ -224,8 +382,8 @@ const [captureConfig, setCaptureConfig] = useState({
   }, [paginatedResults.currentPage, resultsPage]);
 
   const handleToggleLead = (leadId) => {
-    setSelectedLeads(prev => 
-      prev.includes(leadId) 
+    setSelectedLeads(prev =>
+      prev.includes(leadId)
         ? prev.filter(id => id !== leadId)
         : [...prev, leadId]
     );
@@ -245,7 +403,7 @@ const [captureConfig, setCaptureConfig] = useState({
     const imported = [];
     let skippedAlreadyClaimed = 0;
     let skippedAlreadyImported = 0;
-    
+
     for (const lead of leadsToImport) {
       const claim = await assertCaptureAvailableForUser(lead, user);
       if (!claim.claimed) {
@@ -349,7 +507,7 @@ const [captureConfig, setCaptureConfig] = useState({
   };
 
   const handleStartSending = async () => {
-    const leadsToImport = await handleImportLeads(); // Import first before sending
+    const leadsToImport = await handleImportLeads();
 
     if (leadsToImport.length === 0) {
       addNotification(
@@ -359,22 +517,21 @@ const [captureConfig, setCaptureConfig] = useState({
       );
       return;
     }
-    
+
     setStep(5);
     setSendingProgress({ current: 0, total: leadsToImport.length, status: 'preparing', nextIn: 0 });
     setSendingLogs([]);
 
     for (let i = 0; i < leadsToImport.length; i++) {
       const lead = leadsToImport[i];
-      
+
       try {
         setSendingProgress(prev => ({ ...prev, status: 'sending', nextIn: 0 }));
         const html = emailService.generateEmailHtml(lead, emailTemplate.body);
         const subject = emailTemplate.subject.replace(/\[Nome do lead capturado\]/g, lead.name);
 
         setSendingLogs(prev => [...prev, { id: lead.id, name: lead.name, status: 'sending' }]);
-        
-        // Ensure email exists before trying to send
+
         if (!lead.email) {
           throw new Error('No email found');
         }
@@ -394,19 +551,18 @@ const [captureConfig, setCaptureConfig] = useState({
             }),
           ],
         });
-        
-        setSendingLogs(prev => prev.map(log => 
+
+        setSendingLogs(prev => prev.map(log =>
           log.id === lead.id ? { ...log, status: 'success' } : log
         ));
       } catch (err) {
-        setSendingLogs(prev => prev.map(log => 
+        setSendingLogs(prev => prev.map(log =>
           log.id === lead.id ? { ...log, status: 'error', error: err.message } : log
         ));
       }
-      
+
       setSendingProgress(prev => ({ ...prev, current: i + 1 }));
-      
-      // Gmail-safe pacing for cold outreach: one recipient per minute.
+
       if (i < leadsToImport.length - 1) {
         await waitForNextSend(GMAIL_SEND_DELAY_MS);
       }
@@ -419,8 +575,9 @@ const [captureConfig, setCaptureConfig] = useState({
   const renderStep1 = () => (
     <div className="animate-fade-in">
       <div className="grid grid-2 items-start">
+        {/* Métrica de Captura */}
         <div className="col-span-2 capture-metric-section">
-          <label className="input-label">Metrica de captura</label>
+          <label className="input-label">Métrica de captura</label>
           <div className="capture-metric-grid">
             {CAPTURE_METRICS.map(metric => {
               const MetricIcon = METRIC_ICONS[metric.value] || Target;
@@ -431,7 +588,7 @@ const [captureConfig, setCaptureConfig] = useState({
                   key={metric.value}
                   type="button"
                   className={`capture-metric-card ${isSelected ? 'is-selected' : ''}`}
-                  onClick={() => setCaptureConfig({ ...config, captureMetric: metric.value })}
+                  onClick={() => setCaptureConfig({ ...captureConfig, captureMetric: metric.value })}
                 >
                   <span className="capture-metric-icon">
                     <MetricIcon size={18} />
@@ -446,128 +603,88 @@ const [captureConfig, setCaptureConfig] = useState({
           </div>
         </div>
 
-        <div style={{ position: 'relative', zIndex: showNicheSuggestions ? 1000 : 'auto' }}>
-          <Input 
-            id="niche-input"
+        {/* Nicho / Segmento */}
+        <div className="capture-niche-dropdown">
+          <CustomDropdown
             label={t('leads.capture.form.niche')}
-            placeholder={t('leads.capture.form.nichePlaceholder')}
             value={captureConfig.niche}
-            onChange={e => {
-              setCaptureConfig({...config, niche: e.target.value});
-              setShowNicheSuggestions(true);
+            onChange={(val) => {
+              console.log('[CaptureModal] Nicho alterado:', val);
+              setCaptureConfig({ ...captureConfig, niche: val });
             }}
-            onFocus={() => setShowNicheSuggestions(true)}
-            onClick={() => setShowNicheSuggestions(true)}
-            onBlur={() => setShowNicheSuggestions(false)}
+            options={NICHE_OPTIONS}
+            placeholder="Selecione o nicho..."
+            searchable={true}
+            clearable={true}
+            groupBy="category"
             icon={Target}
-            autoComplete="off"
           />
-          {showNicheSuggestions && NICHE_SUGGESTIONS.filter(n => n.toLowerCase().includes(captureConfig.niche.toLowerCase())).length > 0 && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              marginTop: '4px',
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-strong)',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: 'var(--shadow-lg)',
-              zIndex: 9999,
-              maxHeight: '220px',
-              overflowY: 'auto',
-            }}>
-              {NICHE_SUGGESTIONS.filter(n => n.toLowerCase().includes(captureConfig.niche.toLowerCase())).map((niche, i) => (
-                <div 
-                  key={i}
-                  className="select-option"
-                  onMouseDown={e => {
-                    e.preventDefault();
-                    setCaptureConfig({...config, niche});
-                    setShowNicheSuggestions(false);
-                  }}
-                >
-                  <span>{niche}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
-        
-        <div style={{ position: 'relative', zIndex: showLocationSuggestions ? 1000 : 'auto' }}>
-          <Input 
-            id="location-input"
+
+        {/* Localização */}
+        <div className="capture-location-dropdown">
+          <CustomDropdown
             label={t('leads.capture.form.location')}
-            placeholder={t('leads.capture.form.locationPlaceholder')}
             value={captureConfig.location}
-            onChange={e => {
-              setCaptureConfig({...config, location: e.target.value});
-              setShowLocationSuggestions(true);
+            onChange={(val) => {
+              console.log('[CaptureModal] Localização alterada:', val);
+              setCaptureConfig({ ...captureConfig, location: val });
             }}
-            onFocus={() => setShowLocationSuggestions(true)}
-            onClick={() => setShowLocationSuggestions(true)}
-            onBlur={() => setShowLocationSuggestions(false)}
+            options={LOCATION_OPTIONS}
+            placeholder="Selecione a localização..."
+            searchable={true}
+            clearable={true}
+            groupBy="category"
             icon={MapPin}
-            autoComplete="off"
           />
-          {showLocationSuggestions && LOCATION_SUGGESTIONS.filter(l => l.toLowerCase().includes(captureConfig.location.toLowerCase())).length > 0 && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              marginTop: '4px',
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-strong)',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: 'var(--shadow-lg)',
-              zIndex: 9999,
-              maxHeight: '220px',
-              overflowY: 'auto',
-            }}>
-              {LOCATION_SUGGESTIONS.filter(l => l.toLowerCase().includes(captureConfig.location.toLowerCase())).map((loc, i) => (
-                <div 
-                  key={i}
-                  className="select-option"
-                  onMouseDown={e => {
-                    e.preventDefault();
-                    setCaptureConfig({...config, location: loc});
-                    setShowLocationSuggestions(false);
-                  }}
-                >
-                  <span>{loc}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
-      
-        <Select 
-          id="quantity-select"
-          label={t('leads.capture.form.quantity')}
-          value={captureConfig.quantity}
-          onChange={val => setCaptureConfig({...config, quantity: parseInt(val)})}
-          options={[
-            { value: 10, label: '10 Leads' },
-            { value: 20, label: '20 Leads' },
-            { value: 50, label: '50 Leads' },
-            { value: 100, label: '100 Leads' },
-          ]}
-        />
+
+        {/* Quantidade */}
+        <div>
+          <CustomDropdown
+            label={t('leads.capture.form.quantity')}
+            value={captureConfig.quantity}
+            onChange={(val) => {
+              console.log('[CaptureModal] Quantidade alterada:', val);
+              setCaptureConfig({ ...captureConfig, quantity: parseInt(val) });
+            }}
+            options={QUANTITY_OPTIONS.map(opt => ({
+              ...opt,
+              description: opt.description,
+            }))}
+            placeholder="Selecione a quantidade..."
+            searchable={false}
+            clearable={false}
+            renderOption={(option) => (
+              <div className="custom-dropdown-option-content">
+                <div>
+                  <div className="custom-dropdown-option-label">{option.label}</div>
+                  <div className="custom-dropdown-option-description">{option.description}</div>
+                </div>
+              </div>
+            )}
+          />
+        </div>
+
+        {/* Requisitos de contato */}
         <div className="flex flex-col gap-2">
           <label className="input-label">{t('leads.capture.form.requirements')}</label>
           <div className="capture-requirements-grid">
             {Object.keys(captureConfig.contactRequirements).map(req => (
-              <label key={req} htmlFor={`req-${req}`} className={`capture-requirement-card ${captureConfig.contactRequirements[req] ? 'is-checked' : ''} ${req === 'email' ? 'is-locked' : ''}`}>
-                <input 
+              <label
+                key={req}
+                htmlFor={`req-${req}`}
+                className={`capture-requirement-card ${captureConfig.contactRequirements[req] ? 'is-checked' : ''} ${req === 'email' ? 'is-locked' : ''}`}
+              >
+                <input
                   id={`req-${req}`}
-                  type="checkbox" 
+                  type="checkbox"
                   checked={captureConfig.contactRequirements[req]}
                   onChange={e => setCaptureConfig({
-                    ...config, 
+                    ...captureConfig,
                     contactRequirements: { ...captureConfig.contactRequirements, [req]: e.target.checked }
                   })}
-                  disabled={req === 'email'} // Email is mandatory for this new feature
+                  disabled={req === 'email'}
                 />
                 <span className="capture-requirement-check">
                   <CheckCircle2 size={14} />
@@ -589,7 +706,7 @@ const [captureConfig, setCaptureConfig] = useState({
         <div className="radar-circle delay-2"></div>
         <Zap className="radar-icon" size={48} />
       </div>
-      
+
       <div className="text-center w-full max-w-md">
         <h3 className="mb-2">{t('leads.capture.status.scanning')}</h3>
         <p className="text-muted text-sm mb-3">
@@ -603,10 +720,10 @@ const [captureConfig, setCaptureConfig] = useState({
         <p className="text-muted text-xs mb-8">
           {captureConfig.niche} em {captureConfig.location} · meta de {captureConfig.quantity} leads qualificados
         </p>
-        
+
         <div className="progress-bar-container h-3 mb-3">
-          <div 
-            className="progress-bar-fill bg-success shadow-[0_0_10px_rgba(16,185,129,0.3)]" 
+          <div
+            className="progress-bar-fill bg-success shadow-[0_0_10px_rgba(16,185,129,0.3)]"
             style={{ width: `${captureProgress}%` }}
           ></div>
         </div>
@@ -655,7 +772,7 @@ const [captureConfig, setCaptureConfig] = useState({
             <ShieldCheck size={20} />
           </div>
           <div>
-            <div className="text-xs text-muted uppercase font-bold tracking-wider">Metrica</div>
+            <div className="text-xs text-muted uppercase font-bold tracking-wider">Métrica</div>
             <div className="text-sm font-bold text-primary">
               {CAPTURE_METRICS.find(metric => metric.value === captureConfig.captureMetric)?.label}
             </div>
@@ -664,104 +781,104 @@ const [captureConfig, setCaptureConfig] = useState({
       </div>
 
       <div className="capture-results-panel">
-      <div className="table-wrapper capture-results-table">
-        <table className="table table-sm m-0">
-          <thead className="sticky top-0 bg-surface z-10">
-            <tr>
-              <th className="w-12 text-center">
-                <input 
-                  type="checkbox" 
-                  aria-label="Selecionar todos os leads válidos com email"
-                  className="accent-k-gold-500"
-                  checked={results.filter(l => l.isValid && l.email).length > 0 && selectedLeads.length === results.filter(l => l.isValid && l.email).length}
-                  onChange={handleSelectAll}
-                />
-              </th>
-              <th>{t('leads.company')}</th>
-              <th>{t('leads.score')}</th>
-              <th>{t('leads.capture.results.channels')}</th>
-              <th>{t('common.status')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedResults.pageResults.map(lead => (
-              <tr key={lead.id} className={`${!lead.isValid || !lead.email ? 'opacity-50 grayscale-[0.5]' : 'hover:bg-bg-hover transition-colors'}`}>
-                <td className="text-center">
-                  <input 
-                    type="checkbox" 
-                    aria-label={`Selecionar ${lead.name}`}
+        <div className="table-wrapper capture-results-table">
+          <table className="table table-sm m-0">
+            <thead className="sticky top-0 bg-surface z-10">
+              <tr>
+                <th className="w-12 text-center">
+                  <input
+                    type="checkbox"
+                    aria-label="Selecionar todos os leads válidos com email"
                     className="accent-k-gold-500"
-                    disabled={!lead.isValid || !lead.email}
-                    checked={selectedLeads.includes(lead.id)}
-                    onChange={() => handleToggleLead(lead.id)}
+                    checked={results.filter(l => l.isValid && l.email).length > 0 && selectedLeads.length === results.filter(l => l.isValid && l.email).length}
+                    onChange={handleSelectAll}
                   />
-                </td>
-                <td>
-                  <div className="font-bold text-sm text-primary">{lead.name}</div>
-                  <div className="text-[11px] text-muted flex items-center gap-1">
-                    <Globe size={10} />
-                    {lead.website ? (
-                      <a
-                        className="capture-lead-link text-info hover:underline"
-                        href={lead.website}
-                        target="_blank"
-                        rel="noreferrer"
-                        title="Abrir site"
-                      >
-                        {lead.website.replace(/^https?:\/\//, '')}
-                      </a>
-                    ) : (
-                      <span className="text-warning">Sem site</span>
-                    )}
-                  </div>
-                  {lead.snippet && (
-                    <div className="text-[9px] text-muted mt-0.5 truncate max-w-[200px]">{lead.snippet.substring(0, 80)}...</div>
-                  )}
-                </td>
-                <td>
-                  <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <div className="progress-bar-container w-20 h-2 rounded-full overflow-hidden bg-raised">
-                        <div
-                          className={`h-full ${lead.score > 70 ? 'bg-success' : lead.score > 40 ? 'bg-warning' : 'bg-danger'}`}
-                          style={{ width: `${lead.score}%` }}
-                        />
-                      </div>
-                      <span className="text-[12px] font-bold font-mono text-primary">{lead.score}</span>
-                    </div>
-                    <div className="text-[9px] text-muted">
-                      {lead.website ? 'Site funcional' : 'Sem site'}
-                      {lead.email && ' | Email'}
-                      {lead.phone && ' | Telefone'}
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <div className="flex flex-col gap-1 text-xs">
-                    {lead.email && (
-                      <div className="flex items-center gap-1 text-muted" title={lead.email}>
-                        <Mail size={12} />
-                        <span className="truncate max-w-[120px]">{lead.email}</span>
-                      </div>
-                    )}
-                    {lead.phone && (
-                      <div className="flex items-center gap-1 text-muted" title={lead.phone}>
-                        <Phone size={12} />
-                        <span>{lead.phone}</span>
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td>
-                  <Badge size="sm" variant={lead.isValid ? (lead.email ? 'success' : 'warning') : 'secondary'}>
-                    {lead.isValid ? (lead.email ? t('leads.capture.results.valid') : 'Sem E-mail') : t('leads.capture.results.invalid')}
-                  </Badge>
-                </td>
+                </th>
+                <th>{t('leads.company')}</th>
+                <th>{t('leads.score')}</th>
+                <th>{t('leads.capture.results.channels')}</th>
+                <th>{t('common.status')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {paginatedResults.pageResults.map(lead => (
+                <tr key={lead.id} className={`${!lead.isValid || !lead.email ? 'opacity-50 grayscale-[0.5]' : 'hover:bg-bg-hover transition-colors'}`}>
+                  <td className="text-center">
+                    <input
+                      type="checkbox"
+                      aria-label={`Selecionar ${lead.name}`}
+                      className="accent-k-gold-500"
+                      disabled={!lead.isValid || !lead.email}
+                      checked={selectedLeads.includes(lead.id)}
+                      onChange={() => handleToggleLead(lead.id)}
+                    />
+                  </td>
+                  <td>
+                    <div className="font-bold text-sm text-primary">{lead.name}</div>
+                    <div className="text-[11px] text-muted flex items-center gap-1">
+                      <Globe size={10} />
+                      {lead.website ? (
+                        <a
+                          className="capture-lead-link text-info hover:underline"
+                          href={lead.website}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Abrir site"
+                        >
+                          {lead.website.replace(/^https?:\/\//, '')}
+                        </a>
+                      ) : (
+                        <span className="text-warning">Sem site</span>
+                      )}
+                    </div>
+                    {lead.snippet && (
+                      <div className="text-[9px] text-muted mt-0.5 truncate max-w-[200px]">{lead.snippet.substring(0, 80)}...</div>
+                    )}
+                  </td>
+                  <td>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <div className="progress-bar-container w-20 h-2 rounded-full overflow-hidden bg-raised">
+                          <div
+                            className={`h-full ${lead.score > 70 ? 'bg-success' : lead.score > 40 ? 'bg-warning' : 'bg-danger'}`}
+                            style={{ width: `${lead.score}%` }}
+                          />
+                        </div>
+                        <span className="text-[12px] font-bold font-mono text-primary">{lead.score}</span>
+                      </div>
+                      <div className="text-[9px] text-muted">
+                        {lead.website ? 'Site funcional' : 'Sem site'}
+                        {lead.email && ' | Email'}
+                        {lead.phone && ' | Telefone'}
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="flex flex-col gap-1 text-xs">
+                      {lead.email && (
+                        <div className="flex items-center gap-1 text-muted" title={lead.email}>
+                          <Mail size={12} />
+                          <span className="truncate max-w-[120px]">{lead.email}</span>
+                        </div>
+                      )}
+                      {lead.phone && (
+                        <div className="flex items-center gap-1 text-muted" title={lead.phone}>
+                          <Phone size={12} />
+                          <span>{lead.phone}</span>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <Badge size="sm" variant={lead.isValid ? (lead.email ? 'success' : 'warning') : 'secondary'}>
+                      {lead.isValid ? (lead.email ? t('leads.capture.results.valid') : 'Sem E-mail') : t('leads.capture.results.invalid')}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <div className="capture-pagination">
           <div className="capture-pagination-range">
             Exibindo {paginatedResults.startItem}-{paginatedResults.endItem} de {paginatedResults.totalItems}
@@ -777,7 +894,7 @@ const [captureConfig, setCaptureConfig] = useState({
               icon={ChevronLeft}
             />
             <span className="capture-pagination-page">
-              Pagina {paginatedResults.currentPage} de {paginatedResults.totalPages}
+              Página {paginatedResults.currentPage} de {paginatedResults.totalPages}
             </span>
             <Button
               variant="secondary"
@@ -799,29 +916,27 @@ const [captureConfig, setCaptureConfig] = useState({
 
     return (
       <div className="capture-email-layout animate-fade-in">
-        {/* Editor de E-mail */}
         <div className="flex-1 flex flex-col gap-4">
           <h4 className="text-primary font-bold flex items-center gap-2">
             <Edit3 size={18} /> Configure a Mensagem Base
           </h4>
-          <Input 
+          <Input
             id="email-subject"
             label="Assunto do E-mail"
             value={emailTemplate.subject}
-            onChange={e => setEmailTemplate({...emailTemplate, subject: e.target.value})}
+            onChange={e => setEmailTemplate({ ...emailTemplate, subject: e.target.value })}
           />
           <div className="flex flex-col gap-2 flex-1">
             <label className="input-label">Corpo do E-mail</label>
-            <textarea 
+            <textarea
               className="input-field resize-none flex-1 font-mono text-sm"
               value={emailTemplate.body}
-              onChange={e => setEmailTemplate({...emailTemplate, body: e.target.value})}
+              onChange={e => setEmailTemplate({ ...emailTemplate, body: e.target.value })}
             />
             <span className="text-[10px] text-muted">Variáveis: [Nome do lead capturado], [Site capturado], [Problema encontrado]</span>
           </div>
         </div>
 
-        {/* Preview do E-mail */}
         <div className="capture-email-preview-panel">
           <h4 className="text-primary font-bold flex items-center gap-2">
             <Search size={18} /> Preview (Exemplo com 1º Lead)
@@ -831,7 +946,7 @@ const [captureConfig, setCaptureConfig] = useState({
               <span className="text-muted">Assunto: </span>
               <strong className="text-primary">{emailTemplate.subject.replace(/\[Nome do lead capturado\]/g, previewLead.name)}</strong>
             </div>
-            <div 
+            <div
               className="capture-email-body"
               dangerouslySetInnerHTML={{ __html: emailService.generateEmailHtml(previewLead, emailTemplate.body, { signatureSrc: '/Assinatura.png' }) }}
             />
@@ -851,10 +966,10 @@ const [captureConfig, setCaptureConfig] = useState({
             <span className="text-k-gold-500 font-bold"> Próximo envio em {sendingProgress.nextIn}s.</span>
           )}
         </p>
-        
+
         <div className="progress-bar-container h-4 mb-3 rounded-full bg-raised overflow-hidden border border-border-default">
-          <div 
-            className="progress-bar-fill bg-k-gold-500 shadow-[0_0_10px_rgba(212,175,55,0.4)] transition-all duration-500" 
+          <div
+            className="progress-bar-fill bg-k-gold-500 shadow-[0_0_10px_rgba(212,175,55,0.4)] transition-all duration-500"
             style={{ width: `${sendingProgress.total ? (sendingProgress.current / sendingProgress.total) * 100 : 0}%` }}
           ></div>
         </div>
@@ -938,13 +1053,13 @@ const [captureConfig, setCaptureConfig] = useState({
                 {t('common.cancel')}
               </Button>
             )}
-            
+
             {step === 5 && sendingProgress.current === sendingProgress.total && (
               <Button variant="primary" onClick={onClose}>
                 Concluir
               </Button>
             )}
-            
+
             {step === 1 && (
               <Button variant="success" onClick={handleStartCapture} icon={Zap}>
                 {t('leads.capture.modal.start')}
@@ -956,11 +1071,11 @@ const [captureConfig, setCaptureConfig] = useState({
                 Tentar novamente
               </Button>
             )}
-            
+
             {step === 3 && (
-              <Button 
-                variant="primary" 
-                onClick={handlePreviewEmail} 
+              <Button
+                variant="primary"
+                onClick={handlePreviewEmail}
                 disabled={selectedLeads.length === 0}
                 icon={Edit3}
               >
@@ -969,9 +1084,9 @@ const [captureConfig, setCaptureConfig] = useState({
             )}
 
             {step === 4 && (
-              <Button 
-                variant="success" 
-                onClick={handleStartSending} 
+              <Button
+                variant="success"
+                onClick={handleStartSending}
                 icon={PlayCircle}
               >
                 Iniciar Automação
