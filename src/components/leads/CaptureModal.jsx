@@ -356,7 +356,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
       return;
     }
 
-    console.log('[CaptureModal] Iniciando captura com config:', captureConfig);
+    console.log('[CaptureModal] Nova captura iniciada');
 
     // Cancel any previous capture request
     if (captureAbortController.current) {
@@ -366,33 +366,39 @@ const CaptureModal = ({ isOpen, onClose }) => {
 
     // Generate new capture run ID
     const newCaptureRunId = crypto.randomUUID();
-    setCaptureRunId(newCaptureRunId);
+    const oldJobId = currentJobId;
 
-    // Clear all previous results
     console.log('[CaptureModal] captureRunId:', newCaptureRunId);
-    console.log('[CaptureModal] Limpando estado anterior');
 
-    // Clear previous job results if any
-    if (currentJobId) {
-      clearCaptureResults(currentJobId);
+    // CRITICAL: Clear all previous results BEFORE creating new job
+    console.log('[CaptureModal] Limpando estado anterior (jobId:', oldJobId, ')');
+
+    // Clear previous job results first
+    if (oldJobId) {
+      clearCaptureResults(oldJobId);
     }
 
-    // Reset all local state
-    setStep(1);
-    setStep(2); // Set step 2 after clearing
+    // Also clear ALL results to ensure no stale data
+    clearCaptureResults(); // Clear all
+
+    // Reset all local state FIRST
     setSelectedLeads([]);
     setResultsPage(1);
     setCaptureDebug({ candidatesGenerated: 0, candidatesValidated: 0, totalResults: 0, lastError: null });
     setCurrentCaptureConfig({ ...captureConfig });
 
-    // Create new job
-    const jobId = startCaptureJob({ ...captureConfig, captureRunId: newCaptureRunId });
-    setCurrentJobId(jobId);
+    // Create new job with new ID
+    const newJobId = startCaptureJob({ ...captureConfig, captureRunId: newCaptureRunId });
+    setCaptureRunId(newCaptureRunId);
+    setCurrentJobId(newJobId);
+
+    // Now set step to 2 (loading)
+    setStep(2);
 
     console.log('[CaptureModal] Config atual:', captureConfig);
-    console.log('[CaptureModal] Job criado:', jobId);
+    console.log('[CaptureModal] Job criado:', newJobId);
 
-    captureService.runJob(jobId, captureConfig, newCaptureRunId);
+    captureService.runJob(newJobId, captureConfig, newCaptureRunId);
   };
 
   // Update debug info when results change
@@ -405,15 +411,29 @@ const CaptureModal = ({ isOpen, onClose }) => {
   useEffect(() => {
     if (currentJob?.status === 'completed' && step === 2) {
       console.log('[CaptureModal] Captura concluída! Resultados:', results.length);
+      console.log('[CaptureModal] captureRunId atual:', captureRunId);
+      console.log('[CaptureModal] Job captureRunId:', currentJob?.captureRunId);
+
+      // Validate that results match current captureRunId
+      if (currentJob?.captureRunId && captureRunId && currentJob.captureRunId !== captureRunId) {
+        console.warn('[CaptureModal] Resultado de captura anterior ignorado! Expected:', captureRunId, 'Got:', currentJob.captureRunId);
+        console.log('[CaptureModal] Resultado antigo ignorado: true');
+        return; // Don't advance to step 3
+      }
+
       console.log('[CaptureModal] Primeiro lead:', results[0]);
-      setTimeout(() => setStep(3), 500);
+      console.log('[CaptureModal] Resultado aplicado: true');
+
+      if (results.length > 0) {
+        setTimeout(() => setStep(3), 500);
+      }
     }
     if (currentJob?.status === 'failed' && step === 2) {
       console.error('[CaptureModal] Captura falhou:', currentJob?.error);
       setCaptureDebug(prev => ({ ...prev, lastError: currentJob?.error }));
       addNotification(t('common.error'), currentJob?.error || 'A captura falhou. Revise os filtros ou tente novamente.', 'error');
     }
-  }, [currentJob?.status, currentJob?.error, step, addNotification, t, results]);
+  }, [currentJob?.status, currentJob?.error, currentJob?.captureRunId, step, addNotification, t, results, captureRunId]);
 
   useEffect(() => {
     if (resultsPage !== paginatedResults.currentPage) {
@@ -596,10 +616,8 @@ const CaptureModal = ({ isOpen, onClose }) => {
   const handleGoToStep1 = () => {
     console.log('[CaptureModal] Voltando para etapa 1 - limpando tudo');
 
-    // Clear capture results
-    if (currentJobId) {
-      clearCaptureResults(currentJobId);
-    }
+    // Clear all capture results
+    clearCaptureResults();
 
     // Reset all state
     setStep(1);

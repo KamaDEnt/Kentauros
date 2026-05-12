@@ -620,7 +620,7 @@ export const DataProvider = ({ children }) => {
       captureJobs, setCaptureJobs, 
       captureResults, setCaptureResults,
       startCaptureJob: (config) => {
-        const jobId = `job_${Date.now()}`;
+        const jobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
         const newJob = {
           id: jobId,
           tenant_id: tenantId,
@@ -632,7 +632,11 @@ export const DataProvider = ({ children }) => {
           total_valid: 0,
           created_at: new Date().toISOString()
         };
-        setCaptureJobs(prev => [...prev, newJob]);
+        setCaptureJobs(prev => {
+          // Keep only the most recent jobs (limit to 10)
+          const recentJobs = prev.slice(-9);
+          return [...recentJobs, newJob];
+        });
         return jobId;
       },
       updateCaptureJob: (jobId, data) => {
