@@ -208,7 +208,7 @@ export class WebsiteValidatorService {
 
   // Extrair meta description
   extractMetaDescription(content) {
-    const match = content.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["'/i);
+    const match = content.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
     return match ? match[1].trim() : '';
   }
 

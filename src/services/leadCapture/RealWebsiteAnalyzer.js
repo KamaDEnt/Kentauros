@@ -216,7 +216,7 @@ export class RealWebsiteAnalyzer {
     }
 
     // Meta description
-    const descMatch = content.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["'/i);
+    const descMatch = content.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
     if (descMatch) {
       seo.hasMetaDescription = true;
       seo.metaDescription = descMatch[1];
