@@ -126,8 +126,8 @@ const CaptureModal = ({ isOpen, onClose }) => {
   const [sendingProgress, setSendingProgress] = useState({ current: 0, total: 0, status: 'idle', nextIn: 0 });
   const [sendingLogs, setSendingLogs] = useState([]);
   
-  // Form state
-  const [config, setConfig] = useState({
+  // Capture state
+const [captureConfig, setCaptureConfig] = useState({
     captureMetric: 'website_reformulation',
     niche: '',
     location: '',
@@ -139,6 +139,14 @@ const CaptureModal = ({ isOpen, onClose }) => {
       whatsapp: false,
       website: false
     }
+  });
+
+  // Debug state
+  const [captureDebug, setCaptureDebug] = useState({
+    candidatesGenerated: 0,
+    candidatesValidated: 0,
+    totalResults: 0,
+    lastError: null,
   });
 
   const currentJob = useMemo(() => 
@@ -170,32 +178,44 @@ const CaptureModal = ({ isOpen, onClose }) => {
   }), [updateCaptureJob, addCaptureResults]);
 
   const handleStartCapture = async () => {
-    if (!config.niche || !config.location) {
+    if (!captureConfig.niche || !captureConfig.location) {
       addNotification(
-        t('common.error', 'Erro'), 
-        t('leads.capture.notifications.error.missingFields', 'Nicho e Localização são obrigatórios.'), 
+        t('common.error', 'Erro'),
+        t('leads.capture.notifications.error.missingFields', 'Nicho e Localização são obrigatórios.'),
         'error'
       );
       return;
     }
 
-    const jobId = startCaptureJob(config);
+    const jobId = startCaptureJob(captureConfig);
     setCurrentJobId(jobId);
     setResultsPage(1);
     setSelectedLeads([]);
     setStep(2);
-    
-    captureService.runJob(jobId, config);
+    setCaptureDebug({ candidatesGenerated: 0, candidatesValidated: 0, totalResults: 0, lastError: null });
+
+    captureService.runJob(jobId, captureConfig);
   };
+
+  // Update debug info when results change
+  useEffect(() => {
+    if (results.length > 0) {
+      setCaptureDebug(prev => ({ ...prev, totalResults: results.length }));
+    }
+  }, [results.length]);
 
   useEffect(() => {
     if (currentJob?.status === 'completed' && step === 2) {
-      setTimeout(() => setStep(3), 800);
+      console.log('[CaptureModal] Captura concluída! Resultados:', results.length);
+      console.log('[CaptureModal] Primeiro lead:', results[0]);
+      setTimeout(() => setStep(3), 500);
     }
     if (currentJob?.status === 'failed' && step === 2) {
+      console.error('[CaptureModal] Captura falhou:', currentJob?.error);
+      setCaptureDebug(prev => ({ ...prev, lastError: currentJob?.error }));
       addNotification(t('common.error'), currentJob?.error || 'A captura falhou. Revise os filtros ou tente novamente.', 'error');
     }
-  }, [currentJob?.status, currentJob?.error, step, addNotification, t]);
+  }, [currentJob?.status, currentJob?.error, step, addNotification, t, results]);
 
   useEffect(() => {
     if (resultsPage !== paginatedResults.currentPage) {
@@ -247,8 +267,8 @@ const CaptureModal = ({ isOpen, onClose }) => {
         continue;
       }
 
-      const estimatedValue = lead.estimatedValue || calculateAiDevelopmentEstimatedValue(lead, config.captureMetric);
-      const prospectingPlan = lead.prospectingPlan || buildProspectingPlan(lead, config.captureMetric);
+      const estimatedValue = lead.estimatedValue || calculateAiDevelopmentEstimatedValue(lead, captureConfig.captureMetric);
+      const prospectingPlan = lead.prospectingPlan || buildProspectingPlan(lead, captureConfig.captureMetric);
       const formattedValue = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(estimatedValue);
       const importedLead = addLead({
         company: lead.name,
@@ -258,8 +278,8 @@ const CaptureModal = ({ isOpen, onClose }) => {
         website: lead.website || '',
         source: 'Captura Automática',
         value: estimatedValue,
-        notes: `Capturado via automação (${config.niche} em ${config.location}). Valor estimado para desenvolvimento com IA: ${formattedValue}. Score: ${lead.score}/100`,
-        industry: config.niche,
+        notes: `Capturado via automação (${captureConfig.niche} em ${captureConfig.location}). Valor estimado para desenvolvimento com IA: ${formattedValue}. Score: ${lead.score}/100`,
+        industry: captureConfig.niche,
         status: prospectingPlan.nextStage,
         score: lead.score,
         stage: prospectingPlan.tier,
@@ -268,7 +288,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
         conversionSignals: lead.conversionSignals || [],
         interactionHistory: [
           createLeadInteraction('captured', `Lead capturado via ${lead.source || 'automacao'} para ${prospectingPlan.offer.label}.`, {
-            captureMetric: config.captureMetric,
+            captureMetric: captureConfig.captureMetric,
             score: lead.score,
             estimatedValue,
           }),
@@ -277,7 +297,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
         commercialOwnerEmail: user?.email,
         commercialOwnerName: user?.name,
         captureIdentity: claim.identity,
-        captureMetric: config.captureMetric,
+        captureMetric: captureConfig.captureMetric,
         pricingModel: 'ai_development'
       });
 
@@ -365,7 +385,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
           emailStatus: 'sent',
           lastEmailSentAt: new Date().toISOString(),
           lastActivity: new Date().toISOString().split('T')[0],
-          notes: `E-mail de prospecção enviado em ${new Date().toLocaleDateString('pt-BR')}. Capturado via automação (${config.niche} em ${config.location}). Score: ${lead.score}/100`,
+          notes: `E-mail de prospecção enviado em ${new Date().toLocaleDateString('pt-BR')}. Capturado via automação (${captureConfig.niche} em ${captureConfig.location}). Score: ${lead.score}/100`,
           interactionHistory: [
             ...(leads.find(item => item.id === lead.importedLeadId)?.interactionHistory || lead.importedInteractionHistory || []),
             createLeadInteraction('email_sent', 'Primeiro e-mail de prospeccao enviado com diagnostico consultivo.', {
@@ -404,14 +424,14 @@ const CaptureModal = ({ isOpen, onClose }) => {
           <div className="capture-metric-grid">
             {CAPTURE_METRICS.map(metric => {
               const MetricIcon = METRIC_ICONS[metric.value] || Target;
-              const isSelected = config.captureMetric === metric.value;
+              const isSelected = captureConfig.captureMetric === metric.value;
 
               return (
                 <button
                   key={metric.value}
                   type="button"
                   className={`capture-metric-card ${isSelected ? 'is-selected' : ''}`}
-                  onClick={() => setConfig({ ...config, captureMetric: metric.value })}
+                  onClick={() => setCaptureConfig({ ...config, captureMetric: metric.value })}
                 >
                   <span className="capture-metric-icon">
                     <MetricIcon size={18} />
@@ -431,9 +451,9 @@ const CaptureModal = ({ isOpen, onClose }) => {
             id="niche-input"
             label={t('leads.capture.form.niche')}
             placeholder={t('leads.capture.form.nichePlaceholder')}
-            value={config.niche}
+            value={captureConfig.niche}
             onChange={e => {
-              setConfig({...config, niche: e.target.value});
+              setCaptureConfig({...config, niche: e.target.value});
               setShowNicheSuggestions(true);
             }}
             onFocus={() => setShowNicheSuggestions(true)}
@@ -442,7 +462,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
             icon={Target}
             autoComplete="off"
           />
-          {showNicheSuggestions && NICHE_SUGGESTIONS.filter(n => n.toLowerCase().includes(config.niche.toLowerCase())).length > 0 && (
+          {showNicheSuggestions && NICHE_SUGGESTIONS.filter(n => n.toLowerCase().includes(captureConfig.niche.toLowerCase())).length > 0 && (
             <div style={{
               position: 'absolute',
               top: '100%',
@@ -457,13 +477,13 @@ const CaptureModal = ({ isOpen, onClose }) => {
               maxHeight: '220px',
               overflowY: 'auto',
             }}>
-              {NICHE_SUGGESTIONS.filter(n => n.toLowerCase().includes(config.niche.toLowerCase())).map((niche, i) => (
+              {NICHE_SUGGESTIONS.filter(n => n.toLowerCase().includes(captureConfig.niche.toLowerCase())).map((niche, i) => (
                 <div 
                   key={i}
                   className="select-option"
                   onMouseDown={e => {
                     e.preventDefault();
-                    setConfig({...config, niche});
+                    setCaptureConfig({...config, niche});
                     setShowNicheSuggestions(false);
                   }}
                 >
@@ -479,9 +499,9 @@ const CaptureModal = ({ isOpen, onClose }) => {
             id="location-input"
             label={t('leads.capture.form.location')}
             placeholder={t('leads.capture.form.locationPlaceholder')}
-            value={config.location}
+            value={captureConfig.location}
             onChange={e => {
-              setConfig({...config, location: e.target.value});
+              setCaptureConfig({...config, location: e.target.value});
               setShowLocationSuggestions(true);
             }}
             onFocus={() => setShowLocationSuggestions(true)}
@@ -490,7 +510,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
             icon={MapPin}
             autoComplete="off"
           />
-          {showLocationSuggestions && LOCATION_SUGGESTIONS.filter(l => l.toLowerCase().includes(config.location.toLowerCase())).length > 0 && (
+          {showLocationSuggestions && LOCATION_SUGGESTIONS.filter(l => l.toLowerCase().includes(captureConfig.location.toLowerCase())).length > 0 && (
             <div style={{
               position: 'absolute',
               top: '100%',
@@ -505,13 +525,13 @@ const CaptureModal = ({ isOpen, onClose }) => {
               maxHeight: '220px',
               overflowY: 'auto',
             }}>
-              {LOCATION_SUGGESTIONS.filter(l => l.toLowerCase().includes(config.location.toLowerCase())).map((loc, i) => (
+              {LOCATION_SUGGESTIONS.filter(l => l.toLowerCase().includes(captureConfig.location.toLowerCase())).map((loc, i) => (
                 <div 
                   key={i}
                   className="select-option"
                   onMouseDown={e => {
                     e.preventDefault();
-                    setConfig({...config, location: loc});
+                    setCaptureConfig({...config, location: loc});
                     setShowLocationSuggestions(false);
                   }}
                 >
@@ -525,8 +545,8 @@ const CaptureModal = ({ isOpen, onClose }) => {
         <Select 
           id="quantity-select"
           label={t('leads.capture.form.quantity')}
-          value={config.quantity}
-          onChange={val => setConfig({...config, quantity: parseInt(val)})}
+          value={captureConfig.quantity}
+          onChange={val => setCaptureConfig({...config, quantity: parseInt(val)})}
           options={[
             { value: 10, label: '10 Leads' },
             { value: 20, label: '20 Leads' },
@@ -537,15 +557,15 @@ const CaptureModal = ({ isOpen, onClose }) => {
         <div className="flex flex-col gap-2">
           <label className="input-label">{t('leads.capture.form.requirements')}</label>
           <div className="capture-requirements-grid">
-            {Object.keys(config.contactRequirements).map(req => (
-              <label key={req} htmlFor={`req-${req}`} className={`capture-requirement-card ${config.contactRequirements[req] ? 'is-checked' : ''} ${req === 'email' ? 'is-locked' : ''}`}>
+            {Object.keys(captureConfig.contactRequirements).map(req => (
+              <label key={req} htmlFor={`req-${req}`} className={`capture-requirement-card ${captureConfig.contactRequirements[req] ? 'is-checked' : ''} ${req === 'email' ? 'is-locked' : ''}`}>
                 <input 
                   id={`req-${req}`}
                   type="checkbox" 
-                  checked={config.contactRequirements[req]}
-                  onChange={e => setConfig({
+                  checked={captureConfig.contactRequirements[req]}
+                  onChange={e => setCaptureConfig({
                     ...config, 
-                    contactRequirements: { ...config.contactRequirements, [req]: e.target.checked }
+                    contactRequirements: { ...captureConfig.contactRequirements, [req]: e.target.checked }
                   })}
                   disabled={req === 'email'} // Email is mandatory for this new feature
                 />
@@ -581,7 +601,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
           </div>
         )}
         <p className="text-muted text-xs mb-8">
-          {config.niche} em {config.location} · meta de {config.quantity} leads qualificados
+          {captureConfig.niche} em {captureConfig.location} · meta de {captureConfig.quantity} leads qualificados
         </p>
         
         <div className="progress-bar-container h-3 mb-3">
@@ -592,7 +612,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
         </div>
         <div className="flex justify-between text-xs font-bold text-muted px-1">
           <span className="text-success">{captureProgress}%</span>
-          <span>{Math.min(currentJob?.total_found || 0, config.quantity)} de {config.quantity} leads</span>
+          <span>{Math.min(currentJob?.total_found || 0, captureConfig.quantity)} de {captureConfig.quantity} leads</span>
         </div>
       </div>
     </div>
@@ -637,7 +657,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
           <div>
             <div className="text-xs text-muted uppercase font-bold tracking-wider">Metrica</div>
             <div className="text-sm font-bold text-primary">
-              {CAPTURE_METRICS.find(metric => metric.value === config.captureMetric)?.label}
+              {CAPTURE_METRICS.find(metric => metric.value === captureConfig.captureMetric)?.label}
             </div>
           </div>
         </div>
