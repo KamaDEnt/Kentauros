@@ -57,6 +57,8 @@ import {
   Armchair,
   UserCheck,
   Bird,
+  Bookmark,
+  Clock,
 } from 'lucide-react';
 import { LeadCaptureService } from '../../services/leadCapture/LeadCaptureService';
 import { emailService } from '../../services/leadCapture/EmailService';
@@ -491,6 +493,61 @@ const CaptureModal = ({ isOpen, onClose }) => {
   const handlePreviewEmail = () => {
     if (selectedLeads.length === 0) return;
     setStep(4);
+  };
+
+  // Save leads for future contact
+  const [isSavingFuture, setIsSavingFuture] = useState(false);
+
+  const handleSaveForFutureContact = async () => {
+    if (selectedLeads.length === 0) {
+      addNotification('Nenhum lead selecionado', 'Selecione ao menos um lead para salvar.', 'warning');
+      return;
+    }
+
+    setIsSavingFuture(true);
+
+    try {
+      const leadsToSave = results.filter(r => selectedLeads.includes(r.id));
+
+      const response = await fetch('/api/leads/save-for-future-contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leads: leadsToSave,
+          captureMetric: captureConfig.captureMetric,
+          niche: captureConfig.niche,
+          location: captureConfig.location,
+          userId: user?.id,
+          userName: user?.name || user?.email,
+          tenantId: user?.tenant_id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Erro ao salvar leads');
+      }
+
+      addNotification(
+        'Leads salvos com sucesso',
+        data.message || `${data.savedCount} leads salvos para contato futuro.`,
+        'success'
+      );
+
+      // Close modal after successful save
+      onClose();
+
+    } catch (error) {
+      console.error('[CaptureModal] Erro ao salvar para contato futuro:', error);
+      addNotification(
+        'Erro ao salvar',
+        error.message || 'Não foi possível salvar os leads para contato futuro.',
+        'error'
+      );
+    } finally {
+      setIsSavingFuture(false);
+    }
   };
 
   const handleGoBack = () => {
@@ -1134,14 +1191,24 @@ const CaptureModal = ({ isOpen, onClose }) => {
             )}
 
             {step === 3 && (
-              <Button
-                variant="primary"
-                onClick={handlePreviewEmail}
-                disabled={selectedLeads.length === 0}
-                icon={Edit3}
-              >
-                Revisar E-mails
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleSaveForFutureContact}
+                  disabled={selectedLeads.length === 0 || isSavingFuture}
+                  icon={isSavingFuture ? <Loader2 size={16} className="animate-spin" /> : <Clock size={16} />}
+                >
+                  {isSavingFuture ? 'Salvando...' : 'Salvar para contato futuro'}
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handlePreviewEmail}
+                  disabled={selectedLeads.length === 0}
+                  icon={Edit3}
+                >
+                  Revisar E-mails
+                </Button>
+              </div>
             )}
 
             {step === 4 && (

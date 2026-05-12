@@ -162,6 +162,83 @@ function validateWebsite(website) {
   return urlRegex.test(website);
 }
 
+// Extract domain from website URL
+function extractDomain(website) {
+  if (!website) return '';
+  try {
+    const url = website.startsWith('http') ? website : `https://${website}`;
+    const hostname = new URL(url).hostname;
+    return hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return website.replace(/^https?:\/\//, '').split('/')[0].toLowerCase();
+  }
+}
+
+// Normalize string for comparison
+function normalize(str) {
+  if (!str) return '';
+  return str.toLowerCase()
+    .replace(/[^\w\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Check if lead is already captured
+async function checkLeadCaptured(lead) {
+  if (!supabase) return false;
+
+  const domain = extractDomain(lead.website);
+  const email = normalize(lead.email);
+
+  if (!domain && !email) return false;
+
+  try {
+    // Query for existing lead by domain or email
+    let query = supabase
+      .from('captured_leads_registry')
+      .select('id, normalized_domain, normalized_email')
+      .limit(1);
+
+    if (domain) {
+      query = query.eq('normalized_domain', domain);
+    } else if (email) {
+      query = query.eq('normalized_email', email);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.warn('[API] Erro ao verificar captura:', error);
+      return false;
+    }
+
+    return data && data.length > 0;
+  } catch (error) {
+    console.warn('[API] Erro ao verificar captura:', error);
+    return false;
+  }
+}
+
+// Filter leads that are already captured
+async function filterAlreadyCapturedLeads(leads) {
+  if (!supabase) return { filtered: leads, capturedCount: 0 };
+
+  const uncaptured = [];
+  let capturedCount = 0;
+
+  for (const lead of leads) {
+    const isCaptured = await checkLeadCaptured(lead);
+    if (isCaptured) {
+      capturedCount++;
+      console.log('[API] Lead já capturado, ignorando:', lead.name, '-', lead.website);
+    } else {
+      uncaptured.push(lead);
+    }
+  }
+
+  return { filtered: uncaptured, capturedCount };
+}
+
 // Health check endpoint
 export async function GET() {
   return Response.json({
@@ -231,12 +308,21 @@ export async function POST(req) {
     let rawLeads = [];
 
     // Use local database as primary source
-    rawLeads = getLeadsFromLocalDatabase(niche, location, requestedQuantity);
+    rawLeads = getLeadsFromLocalDatabase(niche, location, requestedQuantity * 2); // Get more in case some are filtered
     stats.candidatesFound = rawLeads.length;
     stats.candidatesScanned = rawLeads.length;
     stats.source = 'local_database';
 
     console.log('[API] Leads encontrados no banco local:', rawLeads.length);
+
+    // Filter out leads that are already captured
+    if (supabase) {
+      console.log('[API] Verificando leads já capturados...');
+      const { filtered, capturedCount } = await filterAlreadyCapturedLeads(rawLeads);
+      stats.duplicatesRemoved = capturedCount;
+      rawLeads = filtered;
+      console.log('[API] Leads após filtro de duplicados:', rawLeads.length, '(removidos:', capturedCount, ')');
+    }
 
     // Filter leads based on contact requirements
     const emailRequired = contactRequirements?.email !== false;
