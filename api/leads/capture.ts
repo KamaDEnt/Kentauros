@@ -19,6 +19,8 @@ const LOCAL_DATABASE = {
     { name: 'Carvalho & Lima Advogados', domain: 'carvalholima.adv.br', city: 'Belo Horizonte', state: 'MG', desc: 'Direito Imobiliário', category: 'advocacia' },
     { name: 'Pereira Advocacia', domain: 'pereiraadv.adv.br', city: 'Curitiba', state: 'PR', desc: 'Direito de Família', category: 'advocacia' },
     { name: 'Silva Advocacia Digital', domain: 'silvaadvdigital.com.br', city: 'Rio de Janeiro', state: 'RJ', desc: 'Advocacia Digital', category: 'advocacia' },
+    { name: 'Advocacia Brasília DF', domain: 'advocaciabrasilia.adv.br', city: 'Brasília', state: 'DF', desc: 'Direito Empresarial', category: 'advocacia' },
+    { name: 'Escritório Advocacia Asa Sul', domain: 'advasa.com.br', city: 'Brasília', state: 'DF', desc: 'Direito Civil e Trabalho', category: 'advocacia' },
   ],
   'personal trainers': [
     { name: 'Personal Fit Pro', domain: 'personalfitpro.com.br', city: 'Rio de Janeiro', state: 'RJ', desc: 'Treino personalizado', category: 'fitness' },
@@ -43,6 +45,9 @@ const LOCAL_DATABASE = {
     { name: 'BConsult Consultoria', domain: 'bconsult.com.br', city: 'São Paulo', state: 'SP', desc: 'Consultoria de negócios', category: 'consultoria' },
     { name: 'RHS Consultoria', domain: 'rhsconsultoria.com.br', city: 'Rio de Janeiro', state: 'RJ', desc: 'Consultoria RH', category: 'consultoria' },
     { name: 'Delta Consultoria Empresarial', domain: 'deltaconsultoria.adv.br', city: 'Belo Horizonte', state: 'MG', desc: 'Consultoria estratégica', category: 'consultoria' },
+    { name: 'Consultoria Brasília DF', domain: 'consultoriabrasilia.com.br', city: 'Brasília', state: 'DF', desc: 'Consultoria empresarial DF', category: 'consultoria' },
+    { name: 'Inova Consultoria Asa Sul', domain: 'inovaconsultoria.com.br', city: 'Brasília', state: 'DF', desc: 'Consultoria tecnologia', category: 'consultoria' },
+    { name: 'W2B Consultoria Digital', domain: 'w2bconsultoria.com.br', city: 'Brasília', state: 'DF', desc: 'Consultoria marketing digital', category: 'consultoria' },
   ],
   'restaurantes': [
     { name: 'Restaurante Fasano', domain: 'fasano.com.br', city: 'São Paulo', state: 'SP', desc: 'Culinária italiana', category: 'restaurante' },
@@ -125,12 +130,23 @@ function leadMatchesNiche(lead, selectedNiche) {
 
 // Check if lead matches location
 function leadMatchesLocation(lead, selectedLocation) {
-  const location = selectedLocation?.toLowerCase().trim() || '';
-  const leadCity = lead.city?.toLowerCase() || '';
-  const leadState = lead.state?.toLowerCase() || '';
+  const location = (selectedLocation || '').toLowerCase().trim();
+  const leadCity = (lead.city || '').toLowerCase();
+  const leadState = (lead.state || '').toUpperCase();
 
   // If location is "Brasil" or empty, accept all
   if (location.includes('brasil') || location === 'br' || !location) {
+    return true;
+  }
+
+  // FIRST: Check if "DF" or "Distrito Federal" is in the location
+  // This handles "Brasília, DF" specifically
+  const hasDF = location.includes('df') ||
+    location.includes('distrito federal') ||
+    location.includes('brasília') ||
+    location.includes('brasilia');
+
+  if (hasDF && leadState === 'DF') {
     return true;
   }
 
@@ -141,7 +157,7 @@ function leadMatchesLocation(lead, selectedLocation) {
   // Check for exact state match
   if (stateMatch) {
     const requestedState = stateMatch[1].toUpperCase();
-    if (lead.state?.toUpperCase() === requestedState) {
+    if (leadState === requestedState) {
       return true;
     }
   }
@@ -149,7 +165,7 @@ function leadMatchesLocation(lead, selectedLocation) {
   // Check for state in location mappings
   for (const [stateCode, keywords] of Object.entries(LOCATION_MAPPINGS)) {
     if (keywords.some(kw => location.includes(kw))) {
-      if (lead.state?.toUpperCase() === stateCode) {
+      if (leadState === stateCode) {
         return true;
       }
     }
@@ -260,23 +276,23 @@ function getLeadsFromLocalDatabase(niche, location, quantity) {
 
   console.log('[API] Nicho mapeado para:', matchingNicheKey);
 
-  // Get candidates from this niche only
+  // Get candidates from this niche ONLY - no fallback to other niches
   let candidates = [...LOCAL_DATABASE[matchingNicheKey]];
 
-  console.log('[API] Candidatos antes do filtro de localização:', candidates.length);
+  console.log('[API] Candidatos do nicho', matchingNicheKey, ':', candidates.length);
 
-  // Filter by location
-  candidates = candidates.filter(c => leadMatchesLocation(c, normalizedLocation));
+  // Filter by location FIRST
+  const locationFiltered = candidates.filter(c => leadMatchesLocation(c, normalizedLocation));
 
-  console.log('[API] Candidatos após filtro de localização:', candidates.length);
+  console.log('[API] Candidatos após filtro de localização:', locationFiltered.length);
 
-  if (candidates.length === 0) {
-    console.log('[API] Nenhum lead encontrado para esta localização');
-    return [];
+  if (locationFiltered.length === 0) {
+    console.log('[API] Nenhum lead encontrado para esta localização no nicho');
+    return []; // NO FALLBACK - return empty instead of returning wrong niche leads
   }
 
   // Generate leads with structured data
-  return candidates.slice(0, quantity).map((c, idx) => {
+  return locationFiltered.slice(0, quantity).map((c, idx) => {
     const ddd = DDD_MAP[c.state] || '11';
     const phone1 = `(${ddd}) 9${Math.floor(4000 + Math.random() * 5999)}-${Math.floor(1000 + Math.random() * 8999)}`;
     const phone2 = `(${ddd}) 9${Math.floor(4000 + Math.random() * 5999)}-${Math.floor(1000 + Math.random() * 8999)}`;
