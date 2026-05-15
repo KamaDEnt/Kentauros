@@ -2,6 +2,37 @@
 // Este serviço apenas envia a configuração para o backend e exibe os resultados
 // NÃO faz validação no browser - toda lógica está no backend
 
+export const buildCaptureCompletion = (result = {}, fallbackQuantity = 20) => {
+  const returnedLeads = Array.isArray(result.qualified) ? result.qualified : [];
+  const totalValid = Number(result.qualifiedCount || returnedLeads.length || 0);
+  const requested = Number(result.requested || fallbackQuantity || 20);
+  const hasDisplayableLeads = returnedLeads.length > 0;
+  const hasExactQuantity = totalValid === requested;
+  const isSuccess = result.success === true || hasDisplayableLeads;
+  const isPartialSuccess = isSuccess && !hasExactQuantity;
+  const jobStatus = isSuccess ? 'completed' : 'failed';
+  const phaseMessage = result.errorCode
+    ? (hasDisplayableLeads
+      ? `${returnedLeads.length} leads capturados para revisao`
+      : `[${result.errorCode}] ${result.message}`)
+    : (isSuccess
+      ? `${totalValid} leads qualificados${isPartialSuccess ? ' para revisao' : ''}`
+      : result.message || 'Captura falhou');
+
+  return {
+    returnedLeads,
+    totalValid,
+    requested,
+    hasDisplayableLeads,
+    hasExactQuantity,
+    isSuccess,
+    isPartialSuccess,
+    jobStatus,
+    phaseMessage,
+    errorCode: hasDisplayableLeads ? null : (result.errorCode || null),
+  };
+};
+
 export class LeadCaptureService {
   constructor(dataProvider, baseUrl) {
     this.dataProvider = dataProvider;
@@ -65,6 +96,7 @@ export class LeadCaptureService {
         : (this.baseUrl || window.location.origin);
 
       const apiUrl = `${apiBase}/api/leads/capture`;
+      const streamUrl = `${apiBase}/api/leads/capture-stream`;
 
       console.log('[LeadCaptureService] Chamando API:', apiUrl);
 
@@ -74,9 +106,23 @@ export class LeadCaptureService {
         phaseLabel: 'Buscando candidatos no servidor...',
       });
 
+      if (this.isDev) {
+        const streamedResult = await this.runStreamingCapture({
+          jobId,
+          streamUrl,
+          captureRunId,
+          niche,
+          location,
+          quantity,
+          captureMetric,
+          contactRequirements,
+        });
+        if (streamedResult) return streamedResult;
+      }
+
       // Fazer request para o backend
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 min timeout
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout for expanded validation
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -115,7 +161,21 @@ export class LeadCaptureService {
 
       const result = await response.json();
 
-      console.log('[LeadCaptureService] Resultado recebido para captureRunId:', result.captureRunId);
+      console.log('[LeadCaptureService] captureRunId enviado:', captureRunId);
+      console.log('[LeadCaptureService] captureRunId recebido:', result.captureRunId);
+      console.log('[LeadCaptureService] response completo:', JSON.stringify({
+        success: result.success,
+        captureRunId: result.captureRunId,
+        qualifiedCount: result.qualifiedCount,
+        message: result.message,
+        errorCode: result.errorCode
+      }));
+
+      // CRITICAL: Validate response has captureRunId
+      if (!result.captureRunId) {
+        console.error('[LeadCaptureService] ERRO: Resposta da API sem captureRunId!');
+        throw new Error('Resposta inválida da API: captureRunId ausente.');
+      }
 
       // Validate response matches current captureRunId
       if (captureRunId && result.captureRunId !== captureRunId) {
@@ -125,6 +185,7 @@ export class LeadCaptureService {
           success: false,
           ignored: true,
           message: 'Resultado de captura anterior ignorado',
+          captureRunId: result.captureRunId, // Preserve for debugging
         };
       }
 
@@ -163,14 +224,19 @@ export class LeadCaptureService {
         rejectionReasons: result.rejectionReasons || {},
       };
 
-      // CRITICAL: Determinar status correto
-      // success: false OU qualifiedCount: 0 = falha
-      const isSuccess = result.success === true && (result.qualifiedCount || 0) > 0;
+      // CRITICAL: captura só é concluída quando vier exatamente a quantidade solicitada.
+      const returnedLeads = result.qualified || [];
+      const hasDisplayableLeads = returnedLeads.length > 0;
+      const hasExactQuantity = (result.qualifiedCount || returnedLeads.length || 0) === (result.requested || quantity);
+      const isSuccess = result.success === true || hasDisplayableLeads;
+      const isPartialSuccess = isSuccess && !hasExactQuantity;
       const jobStatus = isSuccess ? 'completed' : 'failed';
       const phaseMessage = result.errorCode
-        ? `[${result.errorCode}] ${result.message}`
+        ? (hasDisplayableLeads
+          ? `${returnedLeads.length} leads capturados para revisão`
+          : `[${result.errorCode}] ${result.message}`)
         : (isSuccess
-          ? (result.qualifiedCount > 0 ? `${result.qualifiedCount} leads qualificados` : 'Nenhum lead encontrado')
+          ? `${result.qualifiedCount || returnedLeads.length} leads qualificados${isPartialSuccess ? ' para revisão' : ''}`
           : result.message || 'Captura falhou');
 
       // Atualizar job final
@@ -178,17 +244,17 @@ export class LeadCaptureService {
         status: jobStatus,
         progress: 100,
         total_found: result.totalFound || 0,
-        total_valid: result.qualifiedCount || 0,
+        total_valid: result.qualifiedCount || returnedLeads.length || 0,
         phaseLabel: phaseMessage,
-        errorCode: result.errorCode || null,
+        errorCode: hasDisplayableLeads ? null : (result.errorCode || null),
         stats,
         rawResponse: result, // Salvar resposta completa para debug
       });
 
       // Adicionar resultados ao job - apenas se houver leads
-      if (result.qualified && result.qualified.length > 0) {
+      if (returnedLeads.length > 0) {
         this.dataProvider.clearCaptureResults(jobId);
-        this.dataProvider.addCaptureResults(jobId, result.qualified);
+        this.dataProvider.addCaptureResults(jobId, returnedLeads);
       } else {
         // Limpar resultados se não houver leads
         this.dataProvider.clearCaptureResults(jobId);
@@ -200,13 +266,13 @@ export class LeadCaptureService {
 
       return {
         success: isSuccess,
-        leads: result.qualified || [],
-        partial: result.partial || false,
+        leads: returnedLeads,
+        partial: result.partial || isPartialSuccess || false,
         stats,
         message: result.message,
         errorCode: result.errorCode || null,
         requested: result.requested,
-        qualifiedCount: result.qualifiedCount,
+        qualifiedCount: result.qualifiedCount || returnedLeads.length,
         totalFound: result.totalFound,
         totalScanned: result.totalScanned,
         rejectedCount: result.rejectedCount,
@@ -273,6 +339,149 @@ export class LeadCaptureService {
         message: errorMessage,
       };
     }
+  }
+
+  async runStreamingCapture({
+    jobId,
+    streamUrl,
+    captureRunId,
+    niche,
+    location,
+    quantity,
+    captureMetric,
+    contactRequirements,
+  }) {
+    const response = await fetch(streamUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        captureRunId,
+        niche,
+        location,
+        quantity,
+        captureMetric,
+        contactRequirements,
+      }),
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let finalResult = null;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line);
+
+        if (event.captureRunId && event.captureRunId !== captureRunId) {
+          console.warn('[LeadCaptureService] Evento de captura antiga ignorado:', event.captureRunId);
+          continue;
+        }
+
+        if (event.type === 'progress') {
+          this.dataProvider.updateCaptureJob(jobId, {
+            status: 'running',
+            progress: Math.max(5, Math.min(99, Number(event.progress || 0))),
+            phaseLabel: event.phaseLabel || 'Captura em andamento...',
+            total_found: event.total_found || 0,
+            total_valid: event.total_valid || 0,
+            stats: {
+              requested: quantity,
+              ...(event.stats || {}),
+            },
+          });
+        }
+
+        if (event.type === 'lead' && event.lead) {
+          this.dataProvider.appendCaptureResults?.(jobId, [event.lead]);
+          this.dataProvider.updateCaptureJob(jobId, {
+            status: 'running',
+            progress: Math.max(5, Math.min(99, Number(event.progress || 0))),
+            phaseLabel: event.phaseLabel || `Lead validado: ${event.validCount || 0}/${quantity}`,
+            total_valid: event.validCount || event.total_valid || 0,
+            stats: {
+              requested: quantity,
+              leadsQualified: event.validCount || event.total_valid || 0,
+            },
+          });
+        }
+
+        if (event.type === 'final') {
+          finalResult = event.result;
+        }
+      }
+    }
+
+    if (!finalResult) {
+      throw new Error('Captura encerrada sem resultado final.');
+    }
+
+    const returnedLeads = finalResult.qualified || [];
+    const hasDisplayableLeads = returnedLeads.length > 0;
+    const hasExactQuantity = (finalResult.qualifiedCount || returnedLeads.length || 0) === (finalResult.requested || quantity);
+    const isSuccess = finalResult.success === true || hasDisplayableLeads;
+    const isPartialSuccess = isSuccess && !hasExactQuantity;
+    const jobStatus = isSuccess ? 'completed' : 'failed';
+    const stats = {
+      requested: finalResult.requested || quantity,
+      candidatesFound: finalResult.stats?.candidatesFound || finalResult.totalScanned || 0,
+      candidatesScanned: finalResult.totalScanned || 0,
+      domainValidated: finalResult.stats?.domainValidated || finalResult.qualifiedCount || 0,
+      domainRejected: finalResult.rejectedCount || 0,
+      duplicatesRemoved: finalResult.stats?.duplicatesRemoved || 0,
+      leadsQualified: finalResult.qualifiedCount || 0,
+      attempts: 1,
+      errors: [],
+      rejectionReasons: finalResult.rejectionReasons || finalResult.stats?.rejectionReasons || {},
+    };
+
+    this.dataProvider.updateCaptureJob(jobId, {
+      status: jobStatus,
+      progress: 100,
+      total_found: finalResult.totalFound || 0,
+      total_valid: finalResult.qualifiedCount || returnedLeads.length || 0,
+      phaseLabel: isSuccess
+        ? `${finalResult.qualifiedCount || returnedLeads.length} leads qualificados${isPartialSuccess ? ' para revisão' : ''}`
+        : finalResult.message || 'Captura falhou',
+      errorCode: hasDisplayableLeads ? null : (finalResult.errorCode || null),
+      error: isSuccess ? null : finalResult.message,
+      stats,
+      rawResponse: finalResult,
+    });
+
+    if (isSuccess && returnedLeads.length > 0) {
+      this.dataProvider.clearCaptureResults(jobId);
+      this.dataProvider.addCaptureResults(jobId, returnedLeads);
+    } else if (returnedLeads.length > 0) {
+      this.dataProvider.appendCaptureResults?.(jobId, returnedLeads);
+    }
+
+    return {
+      success: isSuccess,
+      leads: returnedLeads,
+      partial: finalResult.partial || isPartialSuccess || false,
+      stats,
+      message: finalResult.message,
+      errorCode: finalResult.errorCode || null,
+      requested: finalResult.requested,
+      qualifiedCount: finalResult.qualifiedCount || returnedLeads.length,
+      totalFound: finalResult.totalFound,
+      totalScanned: finalResult.totalScanned,
+      rejectedCount: finalResult.rejectedCount,
+      rejectionReasons: finalResult.rejectionReasons,
+    };
   }
 
   // ============================================

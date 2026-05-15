@@ -258,6 +258,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
     startCaptureJob,
     updateCaptureJob,
     addCaptureResults,
+    appendCaptureResults,
     clearCaptureResults,
     clearAllCaptureJobs,
     captureJobs,
@@ -272,6 +273,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
   const [currentJobId, setCurrentJobId] = useState(null);
   const [selectedLeads, setSelectedLeads] = useState([]);
   const [resultsPage, setResultsPage] = useState(1);
+  const [isStartingCapture, setIsStartingCapture] = useState(false);
 
   // Unique ID for each capture run to prevent race conditions
   const [captureRunId, setCaptureRunId] = useState(null);
@@ -279,6 +281,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
 
   // AbortController for canceling previous requests
   const captureAbortController = useRef(null);
+  const partialReleaseNotifiedRef = useRef(false);
 
   // Email state
   const [emailTemplate, setEmailTemplate] = useState({
@@ -338,8 +341,9 @@ const CaptureModal = ({ isOpen, onClose }) => {
   const captureService = useMemo(() => new LeadCaptureService({
     updateCaptureJob,
     addCaptureResults,
+    appendCaptureResults,
     clearCaptureResults
-  }), [updateCaptureJob, addCaptureResults, clearCaptureResults]);
+  }), [updateCaptureJob, addCaptureResults, appendCaptureResults, clearCaptureResults]);
 
   // Find labels for selected values
   const selectedNicheLabel = NICHE_OPTIONS.find(n => n.value === captureConfig.niche)?.label || '';
@@ -347,6 +351,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
   const selectedQuantityLabel = QUANTITY_OPTIONS.find(q => q.value === captureConfig.quantity)?.label || '';
 
   const handleStartCapture = async () => {
+    if (isStartingCapture || currentJob?.status === 'running') return;
     if (!captureConfig.niche || !captureConfig.location) {
       addNotification(
         t('common.error', 'Erro'),
@@ -356,7 +361,9 @@ const CaptureModal = ({ isOpen, onClose }) => {
       return;
     }
 
+    setIsStartingCapture(true);
     console.log('[CaptureModal] Nova captura iniciada');
+    partialReleaseNotifiedRef.current = false;
 
     // Cancel any previous capture request
     if (captureAbortController.current) {
@@ -398,7 +405,11 @@ const CaptureModal = ({ isOpen, onClose }) => {
     console.log('[CaptureModal] Config atual:', captureConfig);
     console.log('[CaptureModal] Job criado:', newJobId);
 
-    captureService.runJob(newJobId, captureConfig, newCaptureRunId);
+    try {
+      await captureService.runJob(newJobId, captureConfig, newCaptureRunId);
+    } finally {
+      setIsStartingCapture(false);
+    }
   };
 
   // Update debug info when results change
@@ -443,6 +454,22 @@ const CaptureModal = ({ isOpen, onClose }) => {
 
       setCaptureDebug(prev => ({ ...prev, lastError: currentJob?.error || currentJob?.phaseLabel }));
 
+      if (results.length > 0) {
+        if (partialReleaseNotifiedRef.current) {
+          setTimeout(() => setStep(3), 300);
+          return;
+        }
+        partialReleaseNotifiedRef.current = true;
+        console.warn('[CaptureModal] Captura parcial liberada para o grid:', results.length);
+        addNotification(
+          'Leads capturados para revisão',
+          `${results.length} lead(s) com site funcional foram encontrados e liberados no grid.`,
+          'warning'
+        );
+        setTimeout(() => setStep(3), 300);
+        return;
+      }
+
       // Show detailed error notification
       const errorMessage = currentJob?.phaseLabel || currentJob?.error || 'A captura falhou.';
       addNotification(t('common.error'), errorMessage, 'error');
@@ -470,7 +497,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
   };
 
   const handleSelectAll = () => {
-    const validLeads = results.filter(l => l.isValid && l.email).map(l => l.id);
+    const validLeads = results.filter(l => l.isValid && l.website).map(l => l.id);
     if (selectedLeads.length === validLeads.length) {
       setSelectedLeads([]);
     } else {
@@ -497,7 +524,9 @@ const CaptureModal = ({ isOpen, onClose }) => {
         const sameIdentity = existing.captureIdentity && existing.captureIdentity === claim.identity;
         const sameWebsite = existing.website && getCaptureIdentity(existing) === claim.identity;
         const sameEmail = existing.email && lead.email && existing.email.toLowerCase() === lead.email.toLowerCase();
-        return sameIdentity || sameWebsite || sameEmail;
+        const sameNameLocation = (existing.company || '').trim().toLowerCase() === (lead.name || '').trim().toLowerCase()
+          && (existing.location || existing.mapsAddress || '').trim().toLowerCase() === (lead.location || lead.mapsAddress || '').trim().toLowerCase();
+        return sameIdentity || sameWebsite || sameEmail || sameNameLocation;
       }) || imported.some(existing => existing.captureIdentity === claim.identity);
 
       if (alreadyImported) {
@@ -513,11 +542,20 @@ const CaptureModal = ({ isOpen, onClose }) => {
         contact: lead.contact || 'Representante',
         email: lead.email || '',
         phone: lead.phone || '',
+        contacts: lead.contacts || {
+          emails: lead.email ? [lead.email] : [],
+          phones: lead.phone ? [lead.phone] : [],
+          whatsappPhones: lead.whatsapp ? [lead.whatsapp] : [],
+        },
         website: lead.website || '',
         source: 'Captura Automática',
         value: estimatedValue,
         notes: `Capturado via automação (${captureConfig.niche} em ${captureConfig.location}). Valor estimado para desenvolvimento com IA: ${formattedValue}. Score: ${lead.score}/100`,
         industry: captureConfig.niche,
+        location: lead.location || lead.mapsAddress || captureConfig.location,
+        mapsAddress: lead.mapsAddress || '',
+        mapsUrl: lead.mapsUrl || '',
+        hasDigitalPresence: lead.providerMetadata?.hasDigitalPresence ?? Boolean(lead.website),
         status: prospectingPlan.nextStage,
         score: lead.score,
         stage: prospectingPlan.tier,
@@ -570,6 +608,14 @@ const CaptureModal = ({ isOpen, onClose }) => {
 
   const handlePreviewEmail = () => {
     if (selectedLeads.length === 0) return;
+    const selectedWithEmail = results.filter(r => selectedLeads.includes(r.id) && r.email);
+    if (selectedWithEmail.length === 0) {
+      addNotification('Nenhum e-mail disponível', 'Selecione ao menos um lead com e-mail para revisar disparos.', 'warning');
+      return;
+    }
+    if (selectedWithEmail.length !== selectedLeads.length) {
+      setSelectedLeads(selectedWithEmail.map(lead => lead.id));
+    }
     setStep(4);
   };
 
@@ -587,29 +633,41 @@ const CaptureModal = ({ isOpen, onClose }) => {
     try {
       const leadsToSave = results.filter(r => selectedLeads.includes(r.id));
 
-      const response = await fetch('/api/leads/save-for-future-contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          leads: leadsToSave,
-          captureMetric: captureConfig.captureMetric,
-          niche: captureConfig.niche,
-          location: captureConfig.location,
-          userId: user?.id,
-          userName: user?.name || user?.email,
-          tenantId: user?.tenant_id,
-        }),
-      });
+      let registryMessage = '';
+      try {
+        const response = await fetch('/api/leads/save-for-future-contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            leads: leadsToSave,
+            captureMetric: captureConfig.captureMetric,
+            niche: captureConfig.niche,
+            location: captureConfig.location,
+            userId: user?.id,
+            userName: user?.name || user?.email,
+            tenantId: user?.tenant_id,
+          }),
+        });
 
-      const data = await response.json();
+        const data = await response.json().catch(() => ({}));
+        if (response.ok) {
+          registryMessage = data.message || '';
+        } else {
+          console.warn('[CaptureModal] Registro futuro remoto falhou:', data.message || response.statusText);
+        }
+      } catch (registryError) {
+        console.warn('[CaptureModal] Registro futuro remoto indisponível:', registryError.message);
+      }
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Erro ao salvar leads');
+      const imported = await handleImportLeads();
+
+      if (imported.length === 0) {
+        throw new Error('Nenhum lead novo foi adicionado ao grid. Eles podem já existir na carteira ou estar vinculados a outro usuário.');
       }
 
       addNotification(
         'Leads salvos com sucesso',
-        data.message || `${data.savedCount} leads salvos para contato futuro.`,
+        registryMessage || `${imported.length} lead(s) adicionados ao grid para contato futuro.`,
         'success'
       );
 
@@ -640,6 +698,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
     clearCaptureResults();
 
     // Reset all state
+    partialReleaseNotifiedRef.current = false;
     setStep(1);
     setCurrentJobId(null);
     setSelectedLeads([]);
@@ -883,6 +942,23 @@ const CaptureModal = ({ isOpen, onClose }) => {
           <span className="text-success">{captureProgress}%</span>
           <span>{Math.min(currentJob?.total_found || 0, captureConfig.quantity)} de {captureConfig.quantity} leads</span>
         </div>
+
+        {results.length > 0 && (
+          <div className="mt-6 text-left bg-raised border border-border-default rounded-lg overflow-hidden">
+            <div className="px-4 py-3 border-b border-border-default flex items-center justify-between">
+              <span className="text-xs font-bold uppercase text-muted">Leads validados em tempo real</span>
+              <span className="text-xs font-bold text-success">{results.length}/{captureConfig.quantity}</span>
+            </div>
+            <div className="max-h-40 overflow-y-auto">
+              {results.slice(-5).map(lead => (
+                <div key={lead.id || lead.website} className="px-4 py-3 border-b border-border-default last:border-b-0">
+                  <div className="text-sm font-bold text-primary truncate">{lead.name || lead.company}</div>
+                  <div className="text-xs text-muted truncate">{lead.website}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1000,9 +1076,9 @@ const CaptureModal = ({ isOpen, onClose }) => {
                   <th className="w-12 text-center">
                     <input
                       type="checkbox"
-                      aria-label="Selecionar todos os leads válidos com email"
+                      aria-label="Selecionar todos os leads válidos com site"
                       className="accent-k-gold-500"
-                      checked={results.filter(l => l.isValid && l.email).length > 0 && selectedLeads.length === results.filter(l => l.isValid && l.email).length}
+                      checked={results.filter(l => l.isValid && l.website).length > 0 && selectedLeads.length === results.filter(l => l.isValid && l.website).length}
                       onChange={handleSelectAll}
                     />
                   </th>
@@ -1014,13 +1090,13 @@ const CaptureModal = ({ isOpen, onClose }) => {
               </thead>
               <tbody>
                 {paginatedResults.pageResults.map(lead => (
-                  <tr key={lead.id} className={`${!lead.isValid || !lead.email ? 'opacity-50 grayscale-[0.5]' : 'hover:bg-bg-hover transition-colors'}`}>
+                  <tr key={lead.id} className={`${!lead.isValid || !lead.website ? 'opacity-50 grayscale-[0.5]' : 'hover:bg-bg-hover transition-colors'}`}>
                     <td className="text-center">
                       <input
                         type="checkbox"
                         aria-label={`Selecionar ${lead.name}`}
                         className="accent-k-gold-500"
-                        disabled={!lead.isValid || !lead.email}
+                        disabled={!lead.isValid || !lead.website}
                         checked={selectedLeads.includes(lead.id)}
                         onChange={() => handleToggleLead(lead.id)}
                       />
@@ -1280,13 +1356,23 @@ const CaptureModal = ({ isOpen, onClose }) => {
             )}
 
             {step === 1 && (
-              <Button variant="success" onClick={handleStartCapture} icon={Zap}>
+              <Button
+                variant="success"
+                onClick={handleStartCapture}
+                disabled={isStartingCapture}
+                icon={isStartingCapture ? <Loader2 size={16} className="animate-spin" /> : Zap}
+              >
                 {t('leads.capture.modal.start')}
               </Button>
             )}
 
             {step === 2 && currentJob?.status === 'failed' && (
-              <Button variant="success" onClick={handleStartCapture} icon={Zap}>
+              <Button
+                variant="success"
+                onClick={handleStartCapture}
+                disabled={isStartingCapture}
+                icon={isStartingCapture ? <Loader2 size={16} className="animate-spin" /> : Zap}
+              >
                 Tentar novamente
               </Button>
             )}
@@ -1304,7 +1390,7 @@ const CaptureModal = ({ isOpen, onClose }) => {
                 <Button
                   variant="primary"
                   onClick={handlePreviewEmail}
-                  disabled={selectedLeads.length === 0}
+                  disabled={!results.some(lead => selectedLeads.includes(lead.id) && lead.email)}
                   icon={Edit3}
                 >
                   Revisar E-mails
